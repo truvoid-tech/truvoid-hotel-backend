@@ -1,5 +1,8 @@
 @page "/onboarding/staff"
 @layout OnboardingLayout
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject NavigationManager Nav
 
 <PageTitle>TruvoID — Invite Core Team</PageTitle>
 
@@ -32,31 +35,6 @@
     <main class="flex-grow flex items-center justify-center pt-24 pb-16 px-margin-mobile md:px-margin-desktop">
         <div class="w-full max-w-3xl bg-surface-container-lowest border border-surface-variant rounded shadow-sm p-8 md:p-12">
 
-            <!-- Stepper -->
-            <div class="mb-12">
-                <div class="flex items-center justify-between relative">
-                    <div class="absolute left-0 top-1/2 -translate-y-1/2 w-full h-px bg-surface-variant z-0"></div>
-                    <div class="absolute left-0 top-1/2 -translate-y-1/2 h-[2px] bg-primary z-0" style="width: 85%;"></div>
-                    @for (int i = 1; i <= 5; i++)
-                    {
-                        <div class="relative z-10 flex flex-col items-center gap-2">
-                            <div class="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-sm text-label-sm">
-                                <span class="material-symbols-outlined text-[14px]">check</span>
-                            </div>
-                        </div>
-                    }
-                    <!-- Step 6 (current) -->
-                    <div class="relative z-10 flex flex-col items-center gap-2" aria-label="Step 6 of 7">
-                        <div class="w-6 h-6 rounded-full bg-surface-container-lowest border-2 border-primary text-primary flex items-center justify-center font-label-sm text-label-sm font-bold">6</div>
-                        <span class="absolute top-8 font-label-sm text-label-sm text-primary whitespace-nowrap">Step 6 of 7: Staff</span>
-                    </div>
-                    <!-- Step 7 -->
-                    <div class="relative z-10 flex flex-col items-center gap-2">
-                        <div class="w-6 h-6 rounded-full bg-surface-container-lowest border border-outline text-outline flex items-center justify-center font-label-sm text-label-sm">7</div>
-                    </div>
-                </div>
-            </div>
-
             <!-- Header -->
             <div class="mb-10 text-center md:text-left">
                 <h1 class="font-headline-lg text-headline-lg text-on-surface mb-2">Invite Core Team</h1>
@@ -65,44 +43,48 @@
                 </p>
             </div>
 
-            <!-- Invitation Form -->
-            <div class="space-y-6 mb-8" id="invitation-list">
-                <div class="bg-surface-bright border border-surface-variant p-6 rounded relative group">
-                    <button class="absolute top-4 right-4 text-outline hover:text-error transition-colors" type="button">
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded text-red-700 font-body-sm text-body-sm">@_errorMessage</div>
+            }
+
+            <!-- Invitation Forms -->
+            @foreach (var invite in _invites)
+            {
+                <div class="bg-surface-bright border border-surface-variant p-6 rounded relative group mb-6">
+                    <button class="absolute top-4 right-4 text-outline hover:text-error transition-colors" type="button" @onclick="() => RemoveInvite(invite)">
                         <span class="material-symbols-outlined">close</span>
                     </button>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
                         <div>
                             <label class="block font-label-sm text-label-sm text-on-surface-variant uppercase mb-2">Full Name</label>
-                            <input class="w-full input-bespoke px-3 py-2 font-body-sm text-body-sm bg-paper-white" placeholder="e.g. Jane Doe" type="text">
+                            <input class="w-full input-bespoke px-3 py-2 font-body-sm text-body-sm bg-paper-white" placeholder="e.g. Jane Doe" @bind="invite.FullName" type="text">
                         </div>
                         <div>
                             <label class="block font-label-sm text-label-sm text-on-surface-variant uppercase mb-2">Work Email</label>
-                            <input class="w-full input-bespoke px-3 py-2 font-body-sm text-body-sm bg-paper-white" placeholder="jane.doe@institution.com" type="email">
+                            <input class="w-full input-bespoke px-3 py-2 font-body-sm text-body-sm bg-paper-white" placeholder="jane.doe@institution.com" @bind="invite.Email" type="email">
                         </div>
                         <div>
                             <label class="block font-label-sm text-label-sm text-on-surface-variant uppercase mb-2">Role Assignment</label>
-                            <select class="w-full input-bespoke px-3 py-2 font-body-sm text-body-sm bg-paper-white appearance-none cursor-pointer">
-                                <option value="admin">Administrator</option>
-                                <option value="compliance">Compliance Officer</option>
-                                <option selected value="staff">Standard Staff</option>
-                                <option value="auditor">External Auditor</option>
+                            <select class="w-full input-bespoke px-3 py-2 font-body-sm text-body-sm bg-paper-white appearance-none cursor-pointer" @bind="invite.Role">
+                                <option value="1">Administrator</option>
+                                <option value="0" selected>Standard Staff</option>
                             </select>
                         </div>
                         <div>
                             <label class="block font-label-sm text-label-sm text-on-surface-variant uppercase mb-2">Daily Verification Limit</label>
                             <div class="relative">
                                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-outline font-label-md text-label-md">#</span>
-                                <input class="w-full input-bespoke pl-8 pr-3 py-2 font-label-md text-label-md bg-paper-white" min="0" type="number" value="50">
+                                <input class="w-full input-bespoke pl-8 pr-3 py-2 font-label-md text-label-md bg-paper-white" min="0" type="number" @bind="invite.DailyCallLimit">
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            }
 
             <!-- Add Another -->
             <div class="mb-12 border-b border-dashed border-surface-variant pb-8">
-                <button class="flex items-center gap-2 text-primary hover:text-primary-fixed-variant transition-colors font-label-md text-label-md uppercase group" type="button">
+                <button class="flex items-center gap-2 text-primary hover:text-primary-fixed-variant transition-colors font-label-md text-label-md uppercase group" type="button" @onclick="AddInvite">
                     <span class="material-symbols-outlined group-hover:scale-110 transition-transform">add_circle</span>
                     Add Another Staff Member
                 </button>
@@ -110,18 +92,66 @@
 
             <!-- Footer Actions -->
             <div class="flex flex-col-reverse md:flex-row items-center justify-between gap-4">
-                <button class="w-full md:w-auto font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors py-3 px-6 uppercase tracking-wider" type="button">
+                <button class="w-full md:w-auto font-label-md text-label-md text-on-surface-variant hover:text-on-surface transition-colors py-3 px-6 uppercase tracking-wider" @onclick="Skip">
                     Skip for now
                 </button>
                 <div class="flex gap-4 w-full md:w-auto">
-                    <a href="/onboarding/wallet" class="w-full md:w-auto bg-transparent border-[1.5px] border-deep-navy text-deep-navy font-label-md text-label-md py-3 px-8 rounded uppercase tracking-wider hover:bg-surface-container-low transition-colors">
+                    <a href="/onboarding/wallet" class="w-full md:w-auto bg-transparent border-[1.5px] border-deep-navy text-deep-navy font-label-md text-label-md py-3 px-8 rounded uppercase tracking-wider hover:bg-surface-container-low transition-colors text-center">
                         Back
                     </a>
-                    <a href="/onboarding/verify" class="w-full md:w-auto bg-deep-navy text-paper-white font-label-md text-label-md py-3 px-8 rounded uppercase tracking-wider hover:bg-primary transition-colors shadow-sm">
-                        Continue
-                    </a>
+                    <button @onclick="HandleInvite" disabled="@_isLoading" class="w-full md:w-auto bg-deep-navy text-paper-white font-label-md text-label-md py-3 px-8 rounded uppercase tracking-wider hover:bg-primary transition-colors shadow-sm disabled:opacity-50">
+                        @(_isLoading ? "Inviting..." : "Continue")
+                    </button>
                 </div>
             </div>
         </div>
     </main>
 </div>
+
+@code {
+    private List<InviteModel> _invites = new() { new() { DailyCallLimit = 50 } };
+    private bool _isLoading;
+    private string? _errorMessage;
+
+    private void AddInvite() => _invites.Add(new() { DailyCallLimit = 50 });
+    private void RemoveInvite(InviteModel invite) => _invites.Remove(invite);
+    private void Skip() => Nav.NavigateTo("/onboarding/verify");
+
+    private async Task HandleInvite()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            foreach (var invite in _invites.Where(i => !string.IsNullOrWhiteSpace(i.Email)))
+            {
+                await Api.PostRawAsync("/v1/onboarding/staff", new
+                {
+                    fullName = invite.FullName,
+                    email = invite.Email,
+                    role = int.Parse(invite.Role),
+                    dailyCallLimit = invite.DailyCallLimit
+                });
+            }
+
+            Nav.NavigateTo("/onboarding/verify");
+        }
+        catch (Exception)
+        {
+            _errorMessage = "Some invitations failed. You can retry from the dashboard.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private class InviteModel
+    {
+        public string FullName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Role { get; set; } = "0";
+        public int DailyCallLimit { get; set; } = 50;
+    }
+}

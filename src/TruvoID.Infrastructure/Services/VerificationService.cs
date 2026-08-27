@@ -122,7 +122,7 @@ public class VerificationService : IVerificationService
         // 7. Call NIMC partner API (stubbed for now)
         // TODO: Replace with real NIMC partner API call
         call.Status = VerificationStatus.Match;
-        call.MatchedFieldsJson = JsonSerializer.Serialize(new { name = "Sample Match", dob = "1990-01-01" });
+        call.MatchedFieldsJson = JsonSerializer.Serialize(new { name = "Sample Match", dob = "1990-01-01", phone = "08012345678", gender = "Male" });
         call.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
 
@@ -141,6 +141,27 @@ public class VerificationService : IVerificationService
 
     private static VerificationResponse MapToResponse(TruvoID.Domain.Entities.VerificationCall call)
     {
+        VerificationData? data = null;
+        if (!string.IsNullOrEmpty(call.MatchedFieldsJson))
+        {
+            try
+            {
+                var doc = JsonDocument.Parse(call.MatchedFieldsJson);
+                var root = doc.RootElement;
+                data = new VerificationData
+                {
+                    Name = root.TryGetProperty("name", out var nProp) ? nProp.GetString() : null,
+                    DateOfBirth = root.TryGetProperty("dob", out var dProp) ? dProp.GetString() : null,
+                    PhoneNumber = root.TryGetProperty("phone", out var pProp) ? pProp.GetString() : null,
+                    Gender = root.TryGetProperty("gender", out var gProp) ? gProp.GetString() : null
+                };
+            }
+            catch
+            {
+                // If JSON parsing fails, return null data
+            }
+        }
+
         return new VerificationResponse
         {
             Status = call.Status switch
@@ -149,6 +170,7 @@ public class VerificationService : IVerificationService
                 VerificationStatus.NoMatch => "no_match",
                 _ => "error"
             },
+            Data = data,
             CallId = call.Id.ToString(),
             WalletBalanceAfter = call.LedgerEntry?.BalanceAfter ?? 0,
             ErrorCode = call.Status == VerificationStatus.Error ? ErrorCodes.UpstreamError : null,

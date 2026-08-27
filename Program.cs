@@ -1,9 +1,11 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using TruvoID.API.Extensions;
 using TruvoID.API.Middleware;
 using TruvoID.Components;
+using TruvoID.Components.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,6 +42,13 @@ builder.Services.AddAuthentication(options =>
 });
 
 builder.Services.AddAuthorization();
+
+// Blazor auth services
+builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<TruvoIDAuthStateProvider>();
+builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<TruvoIDAuthStateProvider>());
+builder.Services.AddScoped<ApiClient>();
+builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri("/") });
 
 // CORS for dashboard SPA and external API consumers
 builder.Services.AddCors(options =>

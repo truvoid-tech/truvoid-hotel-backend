@@ -1,5 +1,8 @@
 @page "/onboarding/compliance"
 @layout OnboardingLayout
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject NavigationManager Nav
 
 <PageTitle>TruvoID — Regulatory Acknowledgment</PageTitle>
 
@@ -55,6 +58,11 @@
                     </div>
                 </div>
 
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded text-red-700 font-body-sm text-body-sm">@_errorMessage</div>
+                }
+
                 <!-- Terms -->
                 <div class="bg-surface p-6 border border-surface-variant rounded-DEFAULT mb-8 h-64 overflow-y-auto custom-scrollbar">
                     <h3 class="font-label-md text-label-md text-deep-navy uppercase mb-4 tracking-wider">1. Authorized Reseller Status</h3>
@@ -76,7 +84,7 @@
                 <div class="space-y-4 mb-10">
                     <label class="flex items-start gap-4 p-4 border border-surface-variant rounded-DEFAULT hover:bg-surface transition-colors cursor-pointer group">
                         <div class="flex-shrink-0 mt-0.5">
-                            <input class="w-5 h-5 rounded-sm border-outline text-deep-navy focus:ring-deep-navy focus:ring-offset-0 bg-transparent transition-all" type="checkbox">
+                            <input class="w-5 h-5 rounded-sm border-outline text-deep-navy focus:ring-deep-navy focus:ring-offset-0 bg-transparent transition-all" type="checkbox" @bind="_resellerAcknowledged">
                         </div>
                         <div>
                             <span class="block font-label-md text-label-md text-on-surface mb-1 group-hover:text-deep-navy transition-colors">I acknowledge TruvoID's operational status.</span>
@@ -85,7 +93,7 @@
                     </label>
                     <label class="flex items-start gap-4 p-4 border border-surface-variant rounded-DEFAULT hover:bg-surface transition-colors cursor-pointer group">
                         <div class="flex-shrink-0 mt-0.5">
-                            <input class="w-5 h-5 rounded-sm border-outline text-deep-navy focus:ring-deep-navy focus:ring-offset-0 bg-transparent transition-all" type="checkbox">
+                            <input class="w-5 h-5 rounded-sm border-outline text-deep-navy focus:ring-deep-navy focus:ring-offset-0 bg-transparent transition-all" type="checkbox" @bind="_dataProcessingAgreed">
                         </div>
                         <div>
                             <span class="block font-label-md text-label-md text-on-surface mb-1 group-hover:text-deep-navy transition-colors">I agree to the Data Processing Terms.</span>
@@ -100,19 +108,51 @@
                         <span class="material-symbols-outlined text-[18px]">arrow_back</span>
                         Go Back
                     </a>
-                    <a href="/onboarding/wallet" class="w-full sm:w-auto px-8 py-3 font-label-md text-label-md text-white uppercase tracking-wider bg-deep-navy rounded-DEFAULT hover:bg-primary transition-colors flex items-center justify-center gap-2">
-                        Confirm &amp; Continue
+                    <button @onclick="HandleAccept" disabled="@(_isLoading || !_resellerAcknowledged || !_dataProcessingAgreed)" class="w-full sm:w-auto px-8 py-3 font-label-md text-label-md text-white uppercase tracking-wider bg-deep-navy rounded-DEFAULT hover:bg-primary transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
+                        @(_isLoading ? "Saving..." : "Confirm & Continue")
                         <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
-                    </a>
+                    </button>
                 </div>
-            </div>
-        </div>
-
-        <div class="mt-8 text-center">
-            <div class="inline-flex items-center gap-2 font-label-sm text-label-sm text-outline-variant">
-                <span class="material-symbols-outlined text-[16px]">lock</span>
-                SECURE INSTITUTIONAL ONBOARDING
             </div>
         </div>
     </main>
 </div>
+
+@code {
+    private bool _resellerAcknowledged;
+    private bool _dataProcessingAgreed;
+    private bool _isLoading;
+    private string? _errorMessage;
+
+    private async Task HandleAccept()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var response = await Api.PostRawAsync("/v1/onboarding/compliance", new
+            {
+                resellerAcknowledged = _resellerAcknowledged,
+                dataProcessingAgreed = _dataProcessingAgreed
+            });
+
+            if (response.IsSuccessStatusCode)
+            {
+                Nav.NavigateTo("/onboarding/wallet");
+            }
+            else
+            {
+                _errorMessage = await ApiClient.GetErrorMessageAsync(response);
+            }
+        }
+        catch (Exception)
+        {
+            _errorMessage = "Unable to save. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

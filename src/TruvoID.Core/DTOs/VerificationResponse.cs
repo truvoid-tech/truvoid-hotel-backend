@@ -16,6 +16,8 @@ public record VerificationData
 {
     public string? Name { get; init; }
     public string? DateOfBirth { get; init; }
+    public string? PhoneNumber { get; init; }
+    public string? Gender { get; init; }
     public string? PhotoUrl { get; init; }
     public Dictionary<string, string>? AdditionalFields { get; init; }
 }

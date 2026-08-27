@@ -1,5 +1,8 @@
 @page "/onboarding/business"
 @layout OnboardingLayout
+@rendermode InteractiveServer
+@inject ApiClient Api
+@inject NavigationManager Nav
 
 <PageTitle>TruvoID — Business Identity &amp; KYC</PageTitle>
 
@@ -43,97 +46,94 @@
                     </div>
                 </div>
 
-                <form action="#" method="POST">
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded text-red-700 font-body-sm text-body-sm">@_errorMessage</div>
+                }
+
+                <EditForm Model="_model" OnValidSubmit="HandleSubmit">
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
 
                         <!-- Legal Business Name -->
                         <div class="md:col-span-2 flex flex-col gap-2">
                             <label class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest" for="legalName">Legal Business Name</label>
-                            <input class="bespoke-input" id="legalName" name="legalName" placeholder="Registered Entity Name (e.g. Acme Holdings Ltd)" type="text">
+                            <InputText class="bespoke-input" id="legalName" @bind-Value="_model.LegalBusinessName" placeholder="Registered Entity Name (e.g. Acme Holdings Ltd)" />
                         </div>
 
                         <!-- CAC RC Number -->
                         <div class="col-span-1 flex flex-col gap-2">
                             <label class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest" for="rcNumber">CAC RC Number</label>
-                            <input class="bespoke-input font-label-md text-label-md tracking-wider" id="rcNumber" name="rcNumber" placeholder="RC-000000" type="text">
+                            <InputText class="bespoke-input font-label-md text-label-md tracking-wider" id="rcNumber" @bind-Value="_model.CacRcNumber" placeholder="RC-000000" />
                         </div>
 
                         <!-- Business Type -->
                         <div class="col-span-1 flex flex-col gap-2">
                             <label class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest" for="businessType">Business Type</label>
-                            <select class="bespoke-select" id="businessType" name="businessType">
-                                <option disabled selected value="">Select Entity Type</option>
-                                <option value="llc">Limited Liability Company (LLC)</option>
-                                <option value="plc">Public Limited Company (PLC)</option>
-                                <option value="partnership">Partnership</option>
-                                <option value="sole">Sole Proprietorship</option>
-                                <option value="ngo">Non-Governmental Organization</option>
-                            </select>
+                            <InputSelect class="bespoke-select" id="businessType" @bind-Value="_model.Type">
+                                <option value="0">Hotel</option>
+                                <option value="1">Bank</option>
+                                <option value="2">Fintech</option>
+                                <option value="3">HR Department</option>
+                                <option value="4">Landlord</option>
+                                <option value="5">Government</option>
+                                <option value="99">Other</option>
+                            </InputSelect>
                         </div>
 
-                        <!-- CAC Certificate Upload -->
+                        <!-- CAC Certificate Upload (UI only for now) -->
                         <div class="md:col-span-2 flex flex-col gap-2 mt-2">
                             <label class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest flex items-center justify-between">
                                 CAC Certificate of Incorporation
-                                <span class="text-outline text-xs normal-case tracking-normal">*Required</span>
+                                <span class="text-outline text-xs normal-case tracking-normal">*Optional for now</span>
                             </label>
-                            <div class="border-2 border-dashed border-outline-variant/60 rounded-lg p-10 flex flex-col items-center justify-center bg-surface-container-lowest hover:bg-surface-container-low transition-colors duration-300 cursor-pointer group relative">
-                                <input accept=".pdf,.png,.jpg,.jpeg" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" id="cacUpload" type="file">
-                                <div class="w-12 h-12 rounded-full bg-surface-container-low flex items-center justify-center mb-4 group-hover:bg-primary-fixed transition-colors">
-                                    <span class="material-symbols-outlined text-outline group-hover:text-deep-navy transition-colors text-2xl" style="font-variation-settings: 'FILL' 1;">cloud_upload</span>
-                                </div>
-                                <span class="font-body-sm text-body-sm text-on-surface text-center font-medium">Click to upload or drag and drop</span>
-                                <span class="font-label-sm text-label-sm text-outline mt-2 text-center">PDF, JPG or PNG (max. 10MB)</span>
+                            <div class="border-2 border-dashed border-outline-variant/60 rounded-lg p-10 flex flex-col items-center justify-center bg-surface-container-lowest hover:bg-surface-container-low transition-colors duration-300">
+                                <span class="material-symbols-outlined text-outline text-2xl mb-2">cloud_upload</span>
+                                <span class="font-body-sm text-body-sm text-on-surface text-center font-medium">Certificate upload coming soon</span>
                             </div>
                         </div>
 
                         <!-- Business Address -->
                         <div class="md:col-span-2 flex flex-col gap-2 mt-2">
                             <label class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest" for="address">Registered Business Address</label>
-                            <input class="bespoke-input" id="address" name="address" placeholder="Full street address as on registration documents" type="text">
-                        </div>
-
-                        <!-- Business Email -->
-                        <div class="col-span-1 flex flex-col gap-2">
-                            <label class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest" for="email">Primary Business Email</label>
-                            <input class="bespoke-input" id="email" name="email" placeholder="compliance@company.com" type="email">
+                            <InputText class="bespoke-input" id="address" @bind-Value="_model.Address" placeholder="Full street address as on registration documents" />
                         </div>
 
                         <!-- Expected Monthly Volume -->
                         <div class="col-span-1 flex flex-col gap-2">
                             <label class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest" for="volume">Expected Monthly Volume</label>
-                            <select class="bespoke-select" id="volume" name="volume">
-                                <option disabled selected value="">Select Volume Range</option>
+                            <InputSelect class="bespoke-select" id="volume" @bind-Value="_model.ExpectedMonthlyVolume">
+                                <option value="">Select Volume Range</option>
                                 <option value="tier1">&lt; 10,000 Transactions</option>
                                 <option value="tier2">10,000 - 50,000 Transactions</option>
                                 <option value="tier3">50,000 - 250,000 Transactions</option>
                                 <option value="tier4">250,000+ Transactions</option>
-                            </select>
+                            </InputSelect>
                         </div>
 
                         <!-- Primary Use Case -->
-                        <div class="md:col-span-2 flex flex-col gap-2">
+                        <div class="col-span-1 flex flex-col gap-2">
                             <label class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest" for="useCase">Primary Use Case</label>
-                            <select class="bespoke-select" id="useCase" name="useCase">
-                                <option disabled selected value="">Select Primary Function</option>
+                            <InputSelect class="bespoke-select" id="useCase" @bind-Value="_model.PrimaryUseCase">
+                                <option value="">Select Primary Function</option>
                                 <option value="kyc">Customer Onboarding (KYC)</option>
                                 <option value="aml">AML Transaction Monitoring</option>
                                 <option value="identity">Digital Identity Verification</option>
                                 <option value="other">Other Institutional Compliance</option>
-                            </select>
+                            </InputSelect>
                         </div>
                     </div>
 
                     <!-- Footer Actions -->
                     <div class="mt-section-gap pt-8 border-t border-outline-variant/30 flex flex-col sm:flex-row justify-between items-center gap-4">
-                        <button class="w-full sm:w-auto px-6 py-3 border-[1.5px] border-deep-navy text-deep-navy font-label-md text-label-md uppercase rounded hover:bg-surface-container-low transition-colors duration-200" type="button">
-                            Save as Draft
-                        </button>
-                        <a href="/onboarding/admin" class="w-full sm:w-auto px-8 py-3 bg-deep-navy text-white font-label-md text-label-md uppercase rounded shadow-sm hover:bg-primary transition-colors duration-200 flex items-center justify-center gap-2">
-                            Continue to Directors <span class="material-symbols-outlined text-lg">arrow_forward</span>
+                        <a href="/onboarding" class="w-full sm:w-auto px-6 py-3 border-[1.5px] border-deep-navy text-deep-navy font-label-md text-label-md uppercase rounded hover:bg-surface-container-low transition-colors duration-200 text-center">
+                            Back
                         </a>
+                        <button type="submit" disabled="@_isLoading" class="w-full sm:w-auto px-8 py-3 bg-deep-navy text-white font-label-md text-label-md uppercase rounded shadow-sm hover:bg-primary transition-colors duration-200 flex items-center justify-center gap-2 disabled:opacity-50">
+                            @(_isLoading ? "Saving..." : "Continue to Admin Setup")
+                            <span class="material-symbols-outlined text-lg">arrow_forward</span>
+                        </button>
                     </div>
-                </form>
+                </EditForm>
             </div>
         </div>
 
@@ -143,3 +143,46 @@
         </div>
     </main>
 </div>
+
+@code {
+    private BusinessModel _model = new();
+    private bool _isLoading;
+    private string? _errorMessage;
+
+    private async Task HandleSubmit()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var response = await Api.PutRawAsync("/v1/onboarding/business", _model);
+            if (response.IsSuccessStatusCode)
+            {
+                Nav.NavigateTo("/onboarding/admin");
+            }
+            else
+            {
+                _errorMessage = await ApiClient.GetErrorMessageAsync(response);
+            }
+        }
+        catch (Exception)
+        {
+            _errorMessage = "Unable to save. Please try again.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private class BusinessModel
+    {
+        public string LegalBusinessName { get; set; } = string.Empty;
+        public string CacRcNumber { get; set; } = string.Empty;
+        public int Type { get; set; }
+        public string Address { get; set; } = string.Empty;
+        public string ExpectedMonthlyVolume { get; set; } = string.Empty;
+        public string PrimaryUseCase { get; set; } = string.Empty;
+    }
+}

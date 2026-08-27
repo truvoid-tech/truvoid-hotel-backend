@@ -1,0 +1,321 @@
+@page "/dashboard/verify/new"
+@rendermode InteractiveServer
+@inject ApiClient Api
+
+<PageTitle>New Verification — TruvoID</PageTitle>
+
+<style>
+    .input-bespoke:focus {
+        border-color: #1f3864;
+        box-shadow: inset 0 0 0 1px #1f3864;
+        outline: none;
+    }
+    .type-tab {
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    .type-tab.active {
+        background-color: #1f3864;
+        color: white;
+        border-color: #1f3864;
+    }
+    .result-card {
+        animation: fadeSlideIn 0.4s ease-out;
+    }
+    @@keyframes fadeSlideIn {
+        from { opacity: 0; transform: translateY(12px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .spinner {
+        border: 3px solid rgba(31,56,100,0.15);
+        border-radius: 50%;
+        border-top: 3px solid #1f3864;
+        width: 24px;
+        height: 24px;
+        animation: spin 0.8s linear infinite;
+    }
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
+
+<div class="min-h-screen bg-background text-on-background">
+
+    <!-- Header -->
+    <header class="w-full bg-paper-white border-b border-outline-variant h-16 flex items-center px-6">
+        <a href="/dashboard" class="flex items-center gap-2 text-slate-gray hover:text-deep-navy transition-colors font-label-md text-label-md uppercase tracking-wider">
+            <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+            Dashboard
+        </a>
+        <div class="flex-1 text-center">
+            <span class="font-headline-md text-headline-md font-bold text-deep-navy">TruvoID</span>
+        </div>
+        <div class="w-24"></div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 md:px-8 py-10">
+
+        <!-- Page Header -->
+        <div class="mb-8">
+            <h1 class="font-headline-lg text-headline-lg text-deep-navy mb-2">New Verification</h1>
+            <p class="font-body-md text-body-md text-slate-gray">Select a verification type and enter the subject identifier to run a lookup.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-8">
+
+            <!-- Left: Input Panel -->
+            <div class="lg:col-span-2">
+                <div class="bg-paper-white border border-outline-variant rounded-lg p-6 shadow-sm">
+
+                    <!-- Type Tabs -->
+                    <div class="flex gap-2 mb-6">
+                        <button class="type-tab flex-1 px-4 py-3 border border-outline-variant rounded-lg font-label-md text-label-md text-center uppercase @(_selectedType == "nin" ? "active" : "")"
+                                @onclick='() => SelectType("nin")'>
+                            NIN
+                        </button>
+                        <button class="type-tab flex-1 px-4 py-3 border border-outline-variant rounded-lg font-label-md text-label-md text-center uppercase @(_selectedType == "phone" ? "active" : "")"
+                                @onclick='() => SelectType("phone")'>
+                            Phone
+                        </button>
+                    </div>
+
+                    <!-- Input -->
+                    <div class="mb-6">
+                        <label class="block font-label-sm text-label-sm text-slate-gray mb-2 uppercase">
+                            @(_selectedType == "nin" ? "National Identity Number (NIN)" : "Phone Number")
+                        </label>
+                        <input class="input-bespoke w-full border border-outline-variant rounded bg-transparent px-4 py-3 font-body-md text-body-md text-on-background"
+                               @bind="_subjectRef"
+                               placeholder="@(_selectedType == "nin" ? "e.g. 12345678901" : "e.g. 08012345678")"
+                               @onkeydown="HandleKeyDown" />
+                        <p class="mt-2 font-body-sm text-body-sm text-outline">
+                            @(_selectedType == "nin" ? "Enter an 11-digit NIN." : "Enter a valid Nigerian phone number.")
+                        </p>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(_errorMessage))
+                    {
+                        <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 font-body-sm text-body-sm">
+                            @_errorMessage
+                        </div>
+                    }
+
+                    <!-- Submit -->
+                    <button class="w-full bg-deep-navy text-paper-white font-label-md text-label-md uppercase py-4 px-6 rounded-lg hover:bg-ink transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                            @onclick="RunVerification" disabled="@(_isLoading || string.IsNullOrWhiteSpace(_subjectRef))">
+                        @if (_isLoading)
+                        {
+                            <div class="spinner"></div>
+                            <span class="ml-2">Verifying...</span>
+                        }
+                        else
+                        {
+                            <span class="material-symbols-outlined">task_alt</span>
+                            <span>Run Verification</span>
+                        }
+                    </button>
+
+                    <!-- Pricing -->
+                    <div class="mt-6 pt-4 border-t border-outline-variant">
+                        <div class="flex justify-between items-center font-label-sm text-label-sm text-slate-gray">
+                            <span>Cost per lookup</span>
+                            <span class="font-label-md text-label-md text-deep-navy font-semibold">
+                                @(_selectedType == "nin" ? "₦100.00" : "₦50.00")
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Results Panel -->
+            <div class="lg:col-span-3">
+                @if (_isVerifying)
+                {
+                    <!-- Loading State -->
+                    <div class="bg-paper-white border border-outline-variant rounded-lg p-12 shadow-sm flex flex-col items-center justify-center min-h-[400px]">
+                        <div class="spinner mb-4"></div>
+                        <p class="font-body-md text-body-md text-slate-gray">Querying verification database...</p>
+                        <p class="font-body-sm text-body-sm text-outline mt-1">This may take a few seconds</p>
+                    </div>
+                }
+                else if (_result is not null)
+                {
+                    <!-- Result Card -->
+                    <div class="result-card bg-paper-white border border-outline-variant rounded-lg shadow-sm overflow-hidden">
+
+                        <!-- Result Header -->
+                        <div class="p-6 border-b border-outline-variant @(_result.Status == "match" ? "bg-green-50" : _result.Status == "no_match" ? "bg-amber-50" : "bg-red-50")">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <span class="material-symbols-outlined text-2xl @(_result.Status == "match" ? "text-green-600" : _result.Status == "no_match" ? "text-amber-600" : "text-red-600")"
+                                          style="font-variation-settings: 'FILL' 1;">
+                                        @(_result.Status == "match" ? "check_circle" : _result.Status == "no_match" ? "warning" : "error")
+                                    </span>
+                                    <div>
+                                        <h3 class="font-headline-md text-headline-md @(_result.Status == "match" ? "text-green-800" : _result.Status == "no_match" ? "text-amber-800" : "text-red-800")">
+                                            @(_result.Status == "match" ? "Identity Verified" : _result.Status == "no_match" ? "No Match Found" : "Verification Error")
+                                        </h3>
+                                        <p class="font-body-sm text-body-sm text-slate-gray">Call ID: @_result.CallId</p>
+                                    </div>
+                                </div>
+                                <div class="px-3 py-1 rounded-full text-label-sm font-label-sm uppercase @(_result.Status == "match" ? "bg-green-100 text-green-700" : _result.Status == "no_match" ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700")">
+                                    @(_result.Status == "match" ? "MATCH" : _result.Status == "no_match" ? "NO MATCH" : "ERROR")
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Result Body -->
+                        @if (_result.Data is not null)
+                        {
+                            <div class="p-6">
+                                <!-- Photo + Name Header -->
+                                <div class="flex items-center gap-5 mb-8 pb-6 border-b border-outline-variant">
+                                    <div class="w-20 h-20 rounded-full bg-surface-container flex items-center justify-center border-2 border-outline-variant overflow-hidden">
+                                        @if (!string.IsNullOrEmpty(_result.Data.PhotoUrl))
+                                        {
+                                            <img src="@_result.Data.PhotoUrl" alt="Photo" class="w-full h-full object-cover" />
+                                        }
+                                        else
+                                        {
+                                            <span class="material-symbols-outlined text-3xl text-outline">person</span>
+                                        }
+                                    </div>
+                                    <div>
+                                        <h2 class="font-headline-lg text-headline-lg text-deep-navy">@(_result.Data.Name ?? "N/A")</h2>
+                                        <p class="font-body-sm text-body-sm text-slate-gray">@(_selectedType == "nin" ? "NIN Verification" : "Phone Verification") • @DateTime.UtcNow.ToString("dd MMM yyyy, HH:mm")</p>
+                                    </div>
+                                </div>
+
+                                <!-- Detail Grid -->
+                                <div class="grid grid-cols-2 gap-6">
+                                    <div>
+                                        <label class="block font-label-sm text-label-sm text-slate-gray mb-1 uppercase">Full Name</label>
+                                        <p class="font-body-md text-body-md text-deep-navy font-medium">@(_result.Data.Name ?? "N/A")</p>
+                                    </div>
+                                    <div>
+                                        <label class="block font-label-sm text-label-sm text-slate-gray mb-1 uppercase">Gender</label>
+                                        <p class="font-body-md text-body-md text-deep-navy font-medium">@(_result.Data.Gender ?? "N/A")</p>
+                                    </div>
+                                    <div>
+                                        <label class="block font-label-sm text-label-sm text-slate-gray mb-1 uppercase">Phone Number</label>
+                                        <p class="font-body-md text-body-md text-deep-navy font-medium">@(_result.Data.PhoneNumber ?? "N/A")</p>
+                                    </div>
+                                    <div>
+                                        <label class="block font-label-sm text-label-sm text-slate-gray mb-1 uppercase">Date of Birth</label>
+                                        <p class="font-body-md text-body-md text-deep-navy font-medium">@(_result.Data.DateOfBirth ?? "N/A")</p>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        else if (!string.IsNullOrEmpty(_result.ErrorMessage))
+                        {
+                            <div class="p-6">
+                                <div class="p-4 bg-red-50 border border-red-200 rounded text-red-700 font-body-sm text-body-sm">
+                                    @_result.ErrorMessage
+                                </div>
+                            </div>
+                        }
+
+                        <!-- Result Footer -->
+                        <div class="p-4 border-t border-outline-variant bg-surface-container-low flex items-center justify-between">
+                            <span class="font-label-sm text-label-sm text-outline">
+                                Wallet balance after: <strong class="text-deep-navy">₦@_result.WalletBalanceAfter.ToString("N2")</strong>
+                            </span>
+                            <button class="font-label-sm text-label-sm text-deep-navy hover:underline uppercase" @onclick="Reset">
+                                New Lookup
+                            </button>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <!-- Empty State -->
+                    <div class="bg-paper-white border border-outline-variant rounded-lg p-12 shadow-sm flex flex-col items-center justify-center min-h-[400px]">
+                        <span class="material-symbols-outlined text-outline-variant mb-4" style="font-size: 56px;">plagiarism</span>
+                        <h3 class="font-headline-md text-headline-md text-slate-gray mb-2">No Verification Yet</h3>
+                        <p class="font-body-md text-body-md text-outline text-center max-w-sm">
+                            Select a verification type and enter a NIN or phone number on the left to see results here.
+                        </p>
+                    </div>
+                }
+            </div>
+        </div>
+    </main>
+</div>
+
+@code {
+    private string _selectedType = "nin";
+    private string _subjectRef = string.Empty;
+    private bool _isLoading;
+    private bool _isVerifying;
+    private string? _errorMessage;
+    private VerificationResponse? _result;
+
+    private void SelectType(string type)
+    {
+        _selectedType = type;
+        _result = null;
+        _errorMessage = null;
+    }
+
+    private void Reset()
+    {
+        _subjectRef = string.Empty;
+        _result = null;
+        _errorMessage = null;
+        _isVerifying = false;
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !string.IsNullOrWhiteSpace(_subjectRef) && !_isLoading)
+        {
+            await RunVerification();
+        }
+    }
+
+    private async Task RunVerification()
+    {
+        if (string.IsNullOrWhiteSpace(_subjectRef)) return;
+
+        _isLoading = true;
+        _isVerifying = true;
+        _errorMessage = null;
+        _result = null;
+        StateHasChanged();
+
+        try
+        {
+            if (_selectedType == "nin")
+            {
+                _result = await Api.PostAsync<VerificationResponse>("/v1/verify/nin", new { nin = _subjectRef.Trim() });
+            }
+            else
+            {
+                _result = await Api.PostAsync<VerificationResponse>("/v1/verify/phone", new { phoneNumber = _subjectRef.Trim() });
+            }
+
+            if (_result is null)
+            {
+                _errorMessage = "No response from verification service.";
+                _isVerifying = false;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _errorMessage = "Unable to connect to verification service.";
+            _isVerifying = false;
+        }
+        catch (Exception)
+        {
+            _errorMessage = "An unexpected error occurred.";
+            _isVerifying = false;
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+}
