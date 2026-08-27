@@ -1,0 +1,113 @@
+@page "/onboarding/wallet"
+@layout OnboardingLayout
+
+<PageTitle>TruvoID — Wallet Setup</PageTitle>
+
+<div class="bg-background text-on-background font-body-md min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="w-full bg-paper-white border-b border-surface-variant flex items-center justify-between px-margin-desktop h-20">
+        <span class="font-headline-md text-headline-md font-bold text-primary">TruvoID</span>
+        <div class="flex items-center gap-2">
+            <span class="font-label-sm text-label-sm text-outline uppercase tracking-wider">Step 5 of 7</span>
+            <div class="flex gap-1 h-1.5 bg-surface-container-high rounded-full w-48 overflow-hidden">
+                <div class="w-[71%] bg-primary rounded-full"></div>
+            </div>
+        </div>
+        <button class="font-label-sm text-label-sm text-primary hover:text-primary-fixed-dim transition-colors uppercase tracking-wider">Save &amp; Exit</button>
+    </header>
+
+    <main class="flex-grow flex justify-center items-center py-section-gap px-margin-mobile md:px-margin-desktop">
+        <div class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-12 gap-gutter">
+
+            <!-- Left: Context & Pricing -->
+            <div class="md:col-span-5 flex flex-col justify-center">
+                <h1 class="font-headline-lg text-headline-lg md:font-display-lg md:text-display-lg text-primary mb-6">Wallet Setup</h1>
+                <p class="font-body-lg text-body-lg text-on-surface-variant mb-8">
+                    Fund your prepaid wallet to activate API endpoints. Institutional billing is deducted on a per-verification basis.
+                </p>
+                <div class="bg-paper-white border border-surface-variant rounded-lg p-6 mb-8">
+                    <h3 class="font-label-sm text-label-sm text-outline uppercase tracking-wider mb-4 border-b border-surface-variant pb-2">Verification Pricing Matrix</h3>
+                    <ul class="space-y-3 font-label-md text-label-md">
+                        <li class="flex justify-between items-center py-2 border-b border-surface-variant/50">
+                            <span class="text-on-surface">National Identity Number (NIN)</span>
+                            <span class="text-primary font-semibold">₦50.00</span>
+                        </li>
+                        <li class="flex justify-between items-center py-2 border-b border-surface-variant/50">
+                            <span class="text-on-surface">Bank Verification Number (BVN)</span>
+                            <span class="text-primary font-semibold">₦45.00</span>
+                        </li>
+                        <li class="flex justify-between items-center py-2 border-b border-surface-variant/50">
+                            <span class="text-on-surface">Driver's License (FRSC)</span>
+                            <span class="text-primary font-semibold">₦60.00</span>
+                        </li>
+                        <li class="flex justify-between items-center py-2">
+                            <span class="text-on-surface">Voter's Card (INEC)</span>
+                            <span class="text-primary font-semibold">₦55.00</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Right: Funding Interface -->
+            <div class="md:col-span-7 pl-0 md:pl-gutter">
+                <div class="bg-paper-white rounded-lg border-t-2 border-t-warm-gold shadow-[0_12px_32px_-4px_rgba(31,56,100,0.05)] border-x border-b border-surface-variant p-8 h-full flex flex-col">
+                    <div class="flex justify-between items-start mb-8">
+                        <div>
+                            <h2 class="font-headline-md text-headline-md text-primary">Initial Funding</h2>
+                            <p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Minimum deposit: ₦50,000</p>
+                        </div>
+                        <span class="material-symbols-outlined text-outline" style="font-variation-settings: 'FILL' 0;">account_balance_wallet</span>
+                    </div>
+
+                    <form class="flex-grow flex flex-col justify-between">
+                        <div class="space-y-6">
+                            <!-- Amount -->
+                            <div>
+                                <label class="block font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-2" for="funding-amount">Funding Amount (₦)</label>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-on-surface-variant font-label-md">₦</span>
+                                    <input class="w-full pl-8 pr-4 py-3 bg-surface border border-surface-variant rounded-DEFAULT font-label-md text-label-md text-primary focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-colors" id="funding-amount" placeholder="0.00" type="text" value="100,000.00">
+                                </div>
+                                <div class="flex gap-2 mt-3">
+                                    <button class="px-3 py-1 bg-surface-container-low border border-surface-variant rounded font-label-sm text-label-sm text-on-surface hover:bg-surface-container-high transition-colors" type="button">₦50k</button>
+                                    <button class="px-3 py-1 bg-surface-container-low border border-surface-variant rounded font-label-sm text-label-sm text-on-surface hover:bg-surface-container-high transition-colors" type="button">₦100k</button>
+                                    <button class="px-3 py-1 bg-surface-container-low border border-surface-variant rounded font-label-sm text-label-sm text-on-surface hover:bg-surface-container-high transition-colors" type="button">₦250k</button>
+                                </div>
+                            </div>
+
+                            <!-- Card Details -->
+                            <div class="space-y-4 pt-4 border-t border-surface-variant">
+                                <div>
+                                    <label class="block font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-2" for="card-number">Card Number</label>
+                                    <div class="relative">
+                                        <input class="w-full pl-10 pr-4 py-3 bg-surface border border-surface-variant rounded-DEFAULT font-label-md text-label-md text-primary focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-colors" id="card-number" placeholder="0000 0000 0000 0000" type="text">
+                                        <span class="material-symbols-outlined absolute inset-y-0 left-3 flex items-center text-outline text-lg" style="font-variation-settings: 'FILL' 0;">credit_card</span>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-2" for="card-expiry">Expiry</label>
+                                        <input class="w-full px-4 py-3 bg-surface border border-surface-variant rounded-DEFAULT font-label-md text-label-md text-primary focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-colors" id="card-expiry" placeholder="MM/YY" type="text">
+                                    </div>
+                                    <div>
+                                        <label class="block font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-2" for="card-cvv">CVV</label>
+                                        <input class="w-full px-4 py-3 bg-surface border border-surface-variant rounded-DEFAULT font-label-md text-label-md text-primary focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-colors" id="card-cvv" placeholder="123" type="text">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-8 flex justify-end gap-4 border-t border-surface-variant pt-6">
+                            <a href="/onboarding/compliance" class="px-6 py-3 border-[1.5px] border-primary text-primary font-label-md text-label-md uppercase rounded-DEFAULT hover:bg-surface-container-low transition-colors">Back</a>
+                            <a href="/onboarding/staff" class="px-8 py-3 bg-warm-gold text-paper-white font-label-md text-label-md uppercase rounded-DEFAULT hover:bg-on-tertiary-container transition-colors shadow-sm flex items-center gap-2">
+                                <span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">lock</span>
+                                Top Up Wallet
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>

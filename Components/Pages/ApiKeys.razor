@@ -1,0 +1,86 @@
+@page "/api-keys"
+@rendermode InteractiveServer
+@inject IApiKeyService ApiKeyService
+
+<PageTitle>API Keys — TruvoID</PageTitle>
+
+<div class="container mt-4">
+    <h2>API Keys</h2>
+    <p>Manage API keys for programmatic access to the TruvoID Gateway.</p>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Active Keys</span>
+            <button class="btn btn-sm btn-primary" @onclick="GenerateNewKey">Generate New Key</button>
+        </div>
+        <div class="card-body">
+            @if (_newKeyRaw is not null)
+            {
+                <div class="alert alert-warning">
+                    <strong>Save this key now!</strong> It will not be shown again.<br />
+                    <code class="d-block mt-2">@_newKeyRaw</code>
+                </div>
+            }
+
+            @if (_keys?.Any() == true)
+            {
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Key Prefix</th>
+                            <th>Description</th>
+                            <th>Status</th>
+                            <th>Created</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var key in _keys)
+                        {
+                            <tr>
+                                <td><code>@key.KeyPrefix...</code></td>
+                                <td>@key.Description</td>
+                                <td><span class="badge @(key.Status == ApiKeyStatus.Active ? "bg-success" : "bg-secondary")">@key.Status</span></td>
+                                <td>@key.CreatedAt.ToString("dd MMM yyyy")</td>
+                                <td>
+                                    @if (key.Status == ApiKeyStatus.Active)
+                                    {
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => RevokeKey(key.Id)">Revoke</button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <p class="text-muted">No API keys yet. Generate one to get started.</p>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<ApiKeyResponse>? _keys;
+    private string? _newKeyRaw;
+    private Guid _institutionId = Guid.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _keys = await ApiKeyService.GetKeysAsync(_institutionId);
+    }
+
+    private async Task GenerateNewKey()
+    {
+        var result = await ApiKeyService.GenerateKeyAsync(_institutionId, "Generated from dashboard");
+        _newKeyRaw = result.RawKey;
+        _keys = await ApiKeyService.GetKeysAsync(_institutionId);
+    }
+
+    private async Task RevokeKey(Guid keyId)
+    {
+        await ApiKeyService.RevokeKeyAsync(_institutionId, keyId);
+        _keys = await ApiKeyService.GetKeysAsync(_institutionId);
+    }
+}

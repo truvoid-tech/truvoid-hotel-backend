@@ -1,0 +1,159 @@
+@page "/dashboard"
+@namespace TruvoID.Components.DashboardPage
+@layout DashboardLayout
+
+<PageTitle>TruvoID — Dashboard</PageTitle>
+
+<div class="px-margin-mobile md:px-margin-desktop py-8 md:py-12 flex-1 flex flex-col gap-section-gap">
+
+    <!-- Hero: Wallet Balance + Quick Action -->
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-gutter">
+
+        <!-- Wallet Balance Card -->
+        <div class="md:col-span-8 bg-paper-white border-t-[3px] border-t-warm-gold border-x border-b border-outline-variant rounded shadow-sm p-8 flex flex-col justify-between gap-8">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="font-label-sm text-label-sm text-slate-gray uppercase tracking-wider mb-2">Available Balance</p>
+                    <div class="flex items-end gap-2">
+                        <span class="font-display-lg text-display-lg text-primary font-bold leading-none">₦84,500</span>
+                        <span class="font-body-sm text-body-sm text-slate-gray mb-1">.00</span>
+                    </div>
+                    <p class="font-body-sm text-body-sm text-slate-gray mt-2">Estimated capacity: <span class="font-semibold text-on-surface">~1,690 verifications</span></p>
+                </div>
+                <div class="flex flex-col items-end gap-3">
+                    <div class="flex items-center gap-2 bg-surface-container-low border border-outline-variant rounded px-3 py-1.5">
+                        <span class="w-2 h-2 rounded-full bg-[#34a853] inline-block"></span>
+                        <span class="font-label-sm text-label-sm text-slate-gray uppercase tracking-wider">Operational</span>
+                    </div>
+                    <span class="font-body-sm text-[10px] text-slate-gray">Last topped up: 12 Aug 2026</span>
+                </div>
+            </div>
+            <div class="flex items-center gap-4 border-t border-outline-variant pt-6">
+                <a href="/wallet" class="flex items-center gap-2 bg-warm-gold hover:opacity-90 transition-opacity text-paper-white font-label-md text-label-md uppercase py-2.5 px-6 rounded">
+                    <span class="material-symbols-outlined text-[18px]">add</span>
+                    Top Up
+                </a>
+                <a href="/history" class="flex items-center gap-2 border border-outline text-slate-gray hover:text-on-surface hover:border-on-surface transition-colors font-label-md text-label-md uppercase py-2.5 px-6 rounded">
+                    <span class="material-symbols-outlined text-[18px]">history</span>
+                    History
+                </a>
+            </div>
+        </div>
+
+        <!-- Quick Verify Card -->
+        <div class="md:col-span-4 bg-deep-navy rounded p-8 flex flex-col justify-between gap-6">
+            <div>
+                <span class="material-symbols-outlined text-warm-gold mb-4 block" style="font-variation-settings: 'FILL' 1; font-size: 32px;">verified_user</span>
+                <h2 class="font-headline-md text-headline-md text-paper-white mb-2">Verify Identity</h2>
+                <p class="font-body-sm text-body-sm text-on-primary/70">NIN, BVN, or Phone — instant verification against national databases.</p>
+            </div>
+            <a href="/dashboard/verify/select" class="flex items-center justify-center gap-2 bg-warm-gold hover:opacity-90 transition-opacity text-paper-white font-label-md text-label-md uppercase py-3 px-6 rounded">
+                <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+                New Verification
+            </a>
+        </div>
+    </div>
+
+    <!-- Activity Summary Bento Grid -->
+    <div>
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="font-headline-md text-headline-md text-on-surface">Activity Summary</h2>
+            <span class="font-label-sm text-label-sm text-slate-gray uppercase tracking-wider">Last 30 days</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-gutter mb-gutter">
+            <!-- Total Verifications -->
+            <div class="bg-paper-white border border-outline-variant rounded p-6 flex flex-col gap-3">
+                <div class="flex items-center justify-between">
+                    <span class="font-label-sm text-label-sm text-slate-gray uppercase tracking-wider">Total Verifications</span>
+                    <span class="material-symbols-outlined text-deep-navy text-[20px]" style="font-variation-settings: 'FILL' 1;">fact_check</span>
+                </div>
+                <p class="font-display-lg text-display-lg text-primary font-bold">1,248</p>
+                <div class="flex items-center gap-1 text-[#34a853]">
+                    <span class="material-symbols-outlined text-[14px]">trending_up</span>
+                    <span class="font-label-sm text-label-sm">+12% from last month</span>
+                </div>
+            </div>
+
+            <!-- Success Rate -->
+            <div class="bg-paper-white border border-outline-variant rounded p-6 flex flex-col gap-3">
+                <div class="flex items-center justify-between">
+                    <span class="font-label-sm text-label-sm text-slate-gray uppercase tracking-wider">Success Rate</span>
+                    <span class="material-symbols-outlined text-deep-navy text-[20px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+                </div>
+                <p class="font-display-lg text-display-lg text-primary font-bold">98.2%</p>
+                <div class="flex items-center gap-1 text-[#34a853]">
+                    <span class="material-symbols-outlined text-[14px]">trending_up</span>
+                    <span class="font-label-sm text-label-sm">+0.4% from last month</span>
+                </div>
+            </div>
+
+            <!-- Failed & Pending -->
+            <div class="bg-paper-white border border-outline-variant rounded p-6 flex flex-col gap-3">
+                <div class="flex items-center justify-between">
+                    <span class="font-label-sm text-label-sm text-slate-gray uppercase tracking-wider">Failed / Pending</span>
+                    <span class="material-symbols-outlined text-deep-navy text-[20px]" style="font-variation-settings: 'FILL' 1;">report</span>
+                </div>
+                <div class="flex items-end gap-2">
+                    <p class="font-display-lg text-display-lg text-error font-bold">22</p>
+                    <span class="font-headline-md text-headline-md text-slate-gray mb-1">/ 4</span>
+                </div>
+                <div class="flex items-center gap-1 text-slate-gray">
+                    <span class="material-symbols-outlined text-[14px]">remove</span>
+                    <span class="font-label-sm text-label-sm">Normal range</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Activity Table -->
+        <div class="bg-paper-white border border-outline-variant rounded overflow-hidden">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-outline-variant">
+                <h3 class="font-label-md text-label-md uppercase text-on-surface">Recent Transactions</h3>
+                <a href="/history" class="font-label-sm text-label-sm text-deep-navy hover:text-warm-gold transition-colors uppercase tracking-wider">View All</a>
+            </div>
+            <div class="overflow-x-auto table-scroll">
+                <table class="w-full min-w-[600px]">
+                    <thead class="bg-surface-container-low border-b border-outline-variant">
+                        <tr>
+                            <th class="text-left px-6 py-3 font-label-sm text-label-sm text-slate-gray uppercase tracking-wider">Transaction ID</th>
+                            <th class="text-left px-6 py-3 font-label-sm text-label-sm text-slate-gray uppercase tracking-wider">Type</th>
+                            <th class="text-left px-6 py-3 font-label-sm text-label-sm text-slate-gray uppercase tracking-wider">Subject</th>
+                            <th class="text-left px-6 py-3 font-label-sm text-label-sm text-slate-gray uppercase tracking-wider">Status</th>
+                            <th class="text-left px-6 py-3 font-label-sm text-label-sm text-slate-gray uppercase tracking-wider">Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-outline-variant table-row-hover transition-colors">
+                            <td class="px-6 py-4 font-label-md text-label-md text-deep-navy">TRV-2082941</td>
+                            <td class="px-6 py-4"><span class="inline-flex items-center gap-1 bg-surface-container-low border border-outline-variant rounded px-2 py-1 font-label-sm text-label-sm text-on-surface">NIN</span></td>
+                            <td class="px-6 py-4 font-body-sm text-body-sm text-on-surface">Amaka O. ·····1234</td>
+                            <td class="px-6 py-4"><span class="inline-flex items-center gap-1 bg-[#e6f4ea] text-[#137333] border border-[#ceead6] rounded px-2 py-1 font-label-sm text-label-sm">Match</span></td>
+                            <td class="px-6 py-4 font-body-sm text-body-sm text-slate-gray">Today, 14:32</td>
+                        </tr>
+                        <tr class="border-b border-outline-variant table-row-hover transition-colors">
+                            <td class="px-6 py-4 font-label-md text-label-md text-deep-navy">TRV-2082940</td>
+                            <td class="px-6 py-4"><span class="inline-flex items-center gap-1 bg-surface-container-low border border-outline-variant rounded px-2 py-1 font-label-sm text-label-sm text-on-surface">BVN</span></td>
+                            <td class="px-6 py-4 font-body-sm text-body-sm text-on-surface">Chukwu E. ·····5678</td>
+                            <td class="px-6 py-4"><span class="inline-flex items-center gap-1 bg-[#e6f4ea] text-[#137333] border border-[#ceead6] rounded px-2 py-1 font-label-sm text-label-sm">Match</span></td>
+                            <td class="px-6 py-4 font-body-sm text-body-sm text-slate-gray">Today, 13:07</td>
+                        </tr>
+                        <tr class="border-b border-outline-variant table-row-hover transition-colors">
+                            <td class="px-6 py-4 font-label-md text-label-md text-deep-navy">TRV-2082939</td>
+                            <td class="px-6 py-4"><span class="inline-flex items-center gap-1 bg-surface-container-low border border-outline-variant rounded px-2 py-1 font-label-sm text-label-sm text-on-surface">Phone</span></td>
+                            <td class="px-6 py-4 font-body-sm text-body-sm text-on-surface">Eze B. ·····9012</td>
+                            <td class="px-6 py-4"><span class="inline-flex items-center gap-1 bg-[#fce8e6] text-[#c5221f] border border-[#f5c6c4] rounded px-2 py-1 font-label-sm text-label-sm">No Match</span></td>
+                            <td class="px-6 py-4 font-body-sm text-body-sm text-slate-gray">Today, 11:44</td>
+                        </tr>
+                        <tr class="table-row-hover transition-colors">
+                            <td class="px-6 py-4 font-label-md text-label-md text-deep-navy">TRV-2082938</td>
+                            <td class="px-6 py-4"><span class="inline-flex items-center gap-1 bg-surface-container-low border border-outline-variant rounded px-2 py-1 font-label-sm text-label-sm text-on-surface">NIN</span></td>
+                            <td class="px-6 py-4 font-body-sm text-body-sm text-on-surface">Ibrahim T. ·····3456</td>
+                            <td class="px-6 py-4"><span class="inline-flex items-center gap-1 bg-[#fef7e0] text-[#b06000] border border-[#fde083] rounded px-2 py-1 font-label-sm text-label-sm">Pending</span></td>
+                            <td class="px-6 py-4 font-body-sm text-body-sm text-slate-gray">Yesterday, 17:20</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

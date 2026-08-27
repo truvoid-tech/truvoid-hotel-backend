@@ -1,0 +1,22 @@
+bin/
+obj/
+packages/
+*.user
+*.suo
+*.cache
+*.dll
+*.exe
+*.pdb
+.vs/
+*.userprefs
+node_modules/
+.idea/
+
+# Secrets - never commit
+appsettings.*.json
+!appsettings.json
+.env
+*.env.local
+
+# EF Migrations snapshots (keep migration files)
+*.Designer.cs

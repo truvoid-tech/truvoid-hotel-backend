@@ -1,0 +1,68 @@
+@page "/wallet"
+@rendermode InteractiveServer
+@inject IWalletService WalletService
+
+<PageTitle>Wallet — TruvoID</PageTitle>
+
+<div class="container mt-4">
+    <h2>Wallet</h2>
+    <p>View balance and transaction history.</p>
+
+    @if (_balance is not null)
+    {
+        <div class="card mb-4">
+            <div class="card-body text-center">
+                <h3 class="mb-1">₦@_balance.Balance.ToString("N2")</h3>
+                <p class="text-muted mb-0">Current Balance</p>
+            </div>
+        </div>
+    }
+
+    @if (_transactions?.Any() == true)
+    {
+        <div class="card">
+            <div class="card-header">Recent Transactions</div>
+            <div class="card-body p-0">
+                <table class="table table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Amount</th>
+                            <th>Balance</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var tx in _transactions)
+                        {
+                            <tr>
+                                <td>@tx.CreatedAt.ToString("dd MMM yyyy HH:mm")</td>
+                                <td><span class="badge @(tx.Type == WalletTransactionType.Credit ? "bg-success" : tx.Type == WalletTransactionType.Debit ? "bg-danger" : "bg-info")">@tx.Type</span></td>
+                                <td>₦@tx.Amount.ToString("N2")</td>
+                                <td>₦@tx.BalanceAfter.ToString("N2")</td>
+                                <td>@tx.Description</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+    else
+    {
+        <p class="text-muted">No transactions yet.</p>
+    }
+</div>
+
+@code {
+    private WalletBalanceResponse? _balance;
+    private List<WalletTransactionResponse>? _transactions;
+    private Guid _institutionId = Guid.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _balance = await WalletService.GetBalanceAsync(_institutionId);
+        _transactions = await WalletService.GetTransactionsAsync(_institutionId);
+    }
+}

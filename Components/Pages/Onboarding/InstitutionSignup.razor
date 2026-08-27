@@ -1,0 +1,93 @@
+@page "/onboarding"
+@layout OnboardingLayout
+
+<PageTitle>TruvoID — Request Access</PageTitle>
+
+<div class="bg-background text-on-background font-body-md antialiased selection:bg-deep-navy selection:text-paper-white flex flex-col md:flex-row min-h-screen">
+
+    <!-- Left: Brand / Editorial panel — full height, content anchored to bottom -->
+    <div class="hidden md:flex md:w-1/2 lg:w-[45%] min-h-screen relative overflow-hidden flex-col justify-end p-12"
+         style="background-image: url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80'); background-size: cover; background-position: center;">
+
+        <!-- Deep-navy overlay — heavier at bottom for legibility -->
+        <div class="absolute inset-0 z-0" style="background: linear-gradient(to top, rgba(31,56,100,0.97) 0%, rgba(31,56,100,0.75) 45%, rgba(31,56,100,0.40) 100%);"></div>
+
+        <!-- Editorial content — bottom left -->
+        <div class="relative z-10 max-w-md">
+            <h1 class="font-headline-md text-headline-md font-bold text-paper-white tracking-tight mb-4">TruvoID</h1>
+            <p class="font-headline-lg text-headline-lg text-paper-white mb-4 leading-snug">Institutional Identity Infrastructure.</p>
+            <p class="font-body-lg text-body-lg text-paper-white/70">A definitive platform for secure, compliance-ready enterprise identity verification and management.</p>
+        </div>
+    </div>
+
+    <!-- Right: Form -->
+    <div class="flex-1 flex flex-col justify-center items-center p-margin-mobile md:p-margin-desktop h-full overflow-y-auto bg-background">
+        <div class="w-full max-w-md">
+            <div class="md:hidden mb-12">
+                <h1 class="font-headline-md text-headline-md font-bold text-deep-navy tracking-tight">TruvoID</h1>
+            </div>
+
+            <div class="mb-10">
+                <div class="flex items-center gap-2 mb-6">
+                    <div class="flex items-center justify-center w-8 h-8 rounded-full bg-deep-navy text-paper-white font-label-sm text-label-sm">1</div>
+                    <div class="flex flex-col">
+                        <span class="text-label-sm font-label-sm text-slate-gray uppercase tracking-widest">Step 1 of 7</span>
+                        <span class="text-body-sm font-medium text-deep-navy">Institutional Profile</span>
+                    </div>
+                    <div class="flex-1 h-1 bg-surface-container-high ml-4 rounded-full overflow-hidden">
+                        <div class="bg-deep-navy h-full w-[14.28%]"></div>
+                    </div>
+                </div>
+                <h2 class="font-headline-lg text-headline-lg text-deep-navy mb-2">Request Access</h2>
+                <p class="font-body-md text-body-md text-slate-gray">Begin the institutional verification process by submitting your organizational details below.</p>
+            </div>
+
+            <form class="space-y-6">
+                <!-- Legal Business Name -->
+                <div>
+                    <label class="block font-label-sm text-label-sm text-slate-gray uppercase mb-2" for="businessName">Legal Business Name</label>
+                    <div class="relative">
+                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline-variant pointer-events-none">domain</span>
+                        <input class="w-full bg-paper-white border border-surface-container-high rounded-DEFAULT pl-10 pr-4 py-3 font-body-md text-body-md text-on-background focus:ring-1 focus:ring-deep-navy focus:border-deep-navy transition-colors outline-none" id="businessName" name="businessName" placeholder="e.g. Acme Financial Holdings LLC" type="text">
+                    </div>
+                </div>
+
+                <!-- Business Email -->
+                <div>
+                    <label class="block font-label-sm text-label-sm text-slate-gray uppercase mb-2" for="email">Primary Contact Email</label>
+                    <div class="relative">
+                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline-variant pointer-events-none">mail</span>
+                        <input class="w-full bg-paper-white border border-surface-container-high rounded-DEFAULT pl-10 pr-4 py-3 font-body-md text-body-md text-on-background focus:ring-1 focus:ring-deep-navy focus:border-deep-navy transition-colors outline-none" id="email" name="email" placeholder="admin@institution.com" type="email">
+                    </div>
+                </div>
+
+                <!-- Phone -->
+                <div>
+                    <label class="block font-label-sm text-label-sm text-slate-gray uppercase mb-2" for="phone">Institutional Phone</label>
+                    <div class="relative">
+                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline-variant pointer-events-none">phone</span>
+                        <input class="w-full bg-paper-white border border-surface-container-high rounded-DEFAULT pl-10 pr-4 py-3 font-body-md text-body-md text-on-background focus:ring-1 focus:ring-deep-navy focus:border-deep-navy transition-colors outline-none" id="phone" name="phone" placeholder="+234 800 000 0000" type="tel">
+                    </div>
+                </div>
+
+                <!-- Terms -->
+                <div class="pt-2 pb-4">
+                    <p class="font-body-sm text-body-sm text-slate-gray">
+                        By submitting this request, you confirm authorization to act on behalf of the listed entity. Subject to <a class="text-deep-navy hover:underline font-medium" href="#">Compliance Terms</a>.
+                    </p>
+                </div>
+
+                <a href="/onboarding/business" class="w-full bg-deep-navy text-paper-white font-label-md text-label-md uppercase tracking-widest py-4 px-6 rounded-DEFAULT hover:bg-ink transition-colors flex items-center justify-center gap-2 group cursor-pointer">
+                    <span>Continue to Step 2</span>
+                    <span class="material-symbols-outlined text-paper-white group-hover:translate-x-1 transition-transform">arrow_forward</span>
+                </a>
+            </form>
+
+            <div class="mt-8 text-center border-t border-surface-container-high pt-6">
+                <p class="font-body-sm text-body-sm text-slate-gray">
+                    Already a verified institution? <a class="text-deep-navy font-medium hover:underline" href="#">Access Portal</a>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>

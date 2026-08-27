@@ -1,0 +1,145 @@
+@page "/onboarding/business"
+@layout OnboardingLayout
+
+<PageTitle>TruvoID — Business Identity &amp; KYC</PageTitle>
+
+<style>
+    .bespoke-input, .bespoke-select {
+        @@apply w-full h-12 px-4 border border-outline-variant rounded bg-transparent focus:border-deep-navy focus:ring-1 focus:ring-deep-navy outline-none font-body-sm text-body-sm text-on-surface transition-all duration-200 ease-in-out;
+    }
+    .bespoke-select {
+        appearance: none;
+        background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23747780' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 1rem center;
+        background-size: 1em;
+    }
+</style>
+
+<div class="bg-background text-on-background min-h-screen flex flex-col">
+
+    <!-- Minimal header -->
+    <header class="w-full flex items-center justify-between px-margin-mobile md:px-margin-desktop h-20 border-b border-outline-variant/30 bg-surface-container-lowest">
+        <span class="font-headline-md text-headline-md font-bold text-primary tracking-tight">TruvoID</span>
+        <span class="hidden md:block font-label-sm text-label-sm uppercase text-outline tracking-wider">Institutional Verification</span>
+    </header>
+
+    <main class="flex-grow flex flex-col items-center py-12 px-4 md:px-margin-desktop">
+        <div class="w-full max-w-4xl bg-surface-container-lowest border border-outline-variant/50 shadow-sm rounded-lg relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-[2px] bg-warm-gold"></div>
+            <div class="p-6 md:p-12">
+
+                <!-- Progress -->
+                <div class="mb-10">
+                    <div class="flex justify-between items-end mb-2">
+                        <div>
+                            <span class="font-label-sm text-label-sm uppercase text-deep-navy">Step 2 of 7</span>
+                            <h1 class="font-headline-md text-headline-md text-on-surface mt-1">Business Identity &amp; KYC</h1>
+                        </div>
+                        <span class="font-body-sm text-body-sm text-outline hidden sm:block">28% Complete</span>
+                    </div>
+                    <div class="w-full h-1 bg-surface-variant rounded-full overflow-hidden">
+                        <div class="h-full bg-deep-navy w-[28%] rounded-full transition-all duration-500"></div>
+                    </div>
+                </div>
+
+                <form action="#" method="POST">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-gutter">
+
+                        <!-- Legal Business Name -->
+                        <div class="md:col-span-2 flex flex-col gap-2">
+                            <label class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest" for="legalName">Legal Business Name</label>
+                            <input class="bespoke-input" id="legalName" name="legalName" placeholder="Registered Entity Name (e.g. Acme Holdings Ltd)" type="text">
+                        </div>
+
+                        <!-- CAC RC Number -->
+                        <div class="col-span-1 flex flex-col gap-2">
+                            <label class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest" for="rcNumber">CAC RC Number</label>
+                            <input class="bespoke-input font-label-md text-label-md tracking-wider" id="rcNumber" name="rcNumber" placeholder="RC-000000" type="text">
+                        </div>
+
+                        <!-- Business Type -->
+                        <div class="col-span-1 flex flex-col gap-2">
+                            <label class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest" for="businessType">Business Type</label>
+                            <select class="bespoke-select" id="businessType" name="businessType">
+                                <option disabled selected value="">Select Entity Type</option>
+                                <option value="llc">Limited Liability Company (LLC)</option>
+                                <option value="plc">Public Limited Company (PLC)</option>
+                                <option value="partnership">Partnership</option>
+                                <option value="sole">Sole Proprietorship</option>
+                                <option value="ngo">Non-Governmental Organization</option>
+                            </select>
+                        </div>
+
+                        <!-- CAC Certificate Upload -->
+                        <div class="md:col-span-2 flex flex-col gap-2 mt-2">
+                            <label class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest flex items-center justify-between">
+                                CAC Certificate of Incorporation
+                                <span class="text-outline text-xs normal-case tracking-normal">*Required</span>
+                            </label>
+                            <div class="border-2 border-dashed border-outline-variant/60 rounded-lg p-10 flex flex-col items-center justify-center bg-surface-container-lowest hover:bg-surface-container-low transition-colors duration-300 cursor-pointer group relative">
+                                <input accept=".pdf,.png,.jpg,.jpeg" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" id="cacUpload" type="file">
+                                <div class="w-12 h-12 rounded-full bg-surface-container-low flex items-center justify-center mb-4 group-hover:bg-primary-fixed transition-colors">
+                                    <span class="material-symbols-outlined text-outline group-hover:text-deep-navy transition-colors text-2xl" style="font-variation-settings: 'FILL' 1;">cloud_upload</span>
+                                </div>
+                                <span class="font-body-sm text-body-sm text-on-surface text-center font-medium">Click to upload or drag and drop</span>
+                                <span class="font-label-sm text-label-sm text-outline mt-2 text-center">PDF, JPG or PNG (max. 10MB)</span>
+                            </div>
+                        </div>
+
+                        <!-- Business Address -->
+                        <div class="md:col-span-2 flex flex-col gap-2 mt-2">
+                            <label class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest" for="address">Registered Business Address</label>
+                            <input class="bespoke-input" id="address" name="address" placeholder="Full street address as on registration documents" type="text">
+                        </div>
+
+                        <!-- Business Email -->
+                        <div class="col-span-1 flex flex-col gap-2">
+                            <label class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest" for="email">Primary Business Email</label>
+                            <input class="bespoke-input" id="email" name="email" placeholder="compliance@company.com" type="email">
+                        </div>
+
+                        <!-- Expected Monthly Volume -->
+                        <div class="col-span-1 flex flex-col gap-2">
+                            <label class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest" for="volume">Expected Monthly Volume</label>
+                            <select class="bespoke-select" id="volume" name="volume">
+                                <option disabled selected value="">Select Volume Range</option>
+                                <option value="tier1">&lt; 10,000 Transactions</option>
+                                <option value="tier2">10,000 - 50,000 Transactions</option>
+                                <option value="tier3">50,000 - 250,000 Transactions</option>
+                                <option value="tier4">250,000+ Transactions</option>
+                            </select>
+                        </div>
+
+                        <!-- Primary Use Case -->
+                        <div class="md:col-span-2 flex flex-col gap-2">
+                            <label class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest" for="useCase">Primary Use Case</label>
+                            <select class="bespoke-select" id="useCase" name="useCase">
+                                <option disabled selected value="">Select Primary Function</option>
+                                <option value="kyc">Customer Onboarding (KYC)</option>
+                                <option value="aml">AML Transaction Monitoring</option>
+                                <option value="identity">Digital Identity Verification</option>
+                                <option value="other">Other Institutional Compliance</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Footer Actions -->
+                    <div class="mt-section-gap pt-8 border-t border-outline-variant/30 flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <button class="w-full sm:w-auto px-6 py-3 border-[1.5px] border-deep-navy text-deep-navy font-label-md text-label-md uppercase rounded hover:bg-surface-container-low transition-colors duration-200" type="button">
+                            Save as Draft
+                        </button>
+                        <a href="/onboarding/admin" class="w-full sm:w-auto px-8 py-3 bg-deep-navy text-white font-label-md text-label-md uppercase rounded shadow-sm hover:bg-primary transition-colors duration-200 flex items-center justify-center gap-2">
+                            Continue to Directors <span class="material-symbols-outlined text-lg">arrow_forward</span>
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="mt-8 flex items-center justify-center gap-2 text-outline font-label-sm text-label-sm uppercase tracking-widest">
+            <span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">lock</span>
+            End-to-End Encrypted Transmission
+        </div>
+    </main>
+</div>
