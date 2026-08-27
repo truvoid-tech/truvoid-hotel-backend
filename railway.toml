@@ -1,0 +1,4 @@
+[build]
+buildCommand = "dotnet publish src/TruvoID.API/TruvoID.API.csproj -c Release -o out"
+[deploy]
+startCommand = "dotnet out/TruvoID.API.dll"
