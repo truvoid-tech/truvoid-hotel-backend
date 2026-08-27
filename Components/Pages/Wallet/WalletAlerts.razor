@@ -1,0 +1,147 @@
+@page "/wallet/alerts"
+@layout DashboardLayout
+@rendermode InteractiveServer
+@inject ApiClient Api
+
+<PageTitle>Wallet Alerts — TruvoID</PageTitle>
+
+<style>
+    .toggle-checkbox:checked { right: 0; border-color: #1f3864; background-color: #1f3864; }
+    .toggle-checkbox:checked + .toggle-label { background-color: #d8e2ff; }
+</style>
+
+<div class="px-margin-mobile md:px-margin-desktop py-8 md:py-12 flex-1 max-w-4xl mx-auto w-full">
+
+    <header class="mb-10">
+        <h1 class="font-headline-lg text-headline-lg text-primary mb-2">Wallet Alerts & Thresholds</h1>
+        <p class="font-body-md text-body-md text-slate-gray">Configure balance notifications and billing contacts.</p>
+    </header>
+
+    @if (!string.IsNullOrEmpty(_message))
+    {
+        <div class="mb-6 p-4 bg-green-50 border border-green-200 rounded text-green-700 font-body-sm text-body-sm flex items-center gap-2">
+            <span class="material-symbols-outlined text-[16px]">check_circle</span>
+            @_message
+        </div>
+    }
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+
+        <!-- Low Balance Alerts -->
+        <div class="lg:col-span-8 space-y-6">
+            <section class="bg-surface-container-lowest border border-surface-variant rounded-lg p-6 md:p-8">
+                <div class="border-b border-surface-variant pb-4 mb-6">
+                    <h2 class="font-headline-md text-headline-md text-deep-navy">Low Balance Notification</h2>
+                </div>
+                <div class="space-y-6">
+                    <div>
+                        <label class="block font-label-sm text-label-sm text-deep-navy uppercase mb-2">Alert Threshold (₦)</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none font-body-md text-body-md text-outline">₦</span>
+                            <input class="block w-full pl-8 pr-3 py-3 border border-surface-variant rounded-lg bg-surface-container-lowest font-body-md text-body-md text-on-surface focus:ring-1 focus:ring-deep-navy focus:border-deep-navy outline-none transition-colors"
+                                   @bind="_threshold" type="number" min="0" step="1000" />
+                        </div>
+                        <p class="mt-2 font-body-sm text-body-sm text-slate-gray">Trigger an alert when wallet balance falls below this amount.</p>
+                    </div>
+
+                    <div class="space-y-4 pt-4">
+                        <h3 class="font-label-md text-label-md text-deep-navy uppercase">Notification Channels</h3>
+
+                        <label class="flex items-center justify-between p-4 border border-surface-variant rounded-lg cursor-pointer hover:bg-surface-container/50 transition-colors">
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-outline">mail</span>
+                                <div>
+                                    <span class="block font-body-md text-body-md font-medium text-deep-navy">Email Alert</span>
+                                    <span class="block font-body-sm text-body-sm text-slate-gray">Send to primary admin email</span>
+                                </div>
+                            </div>
+                            <div class="relative inline-block w-10 mr-2 align-middle select-none">
+                                <input class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer border-surface-variant transition-transform duration-200 ease-in-out"
+                                       type="checkbox" @bind="_emailEnabled" />
+                                <div class="toggle-label block overflow-hidden h-5 rounded-full bg-surface-variant cursor-pointer"></div>
+                            </div>
+                        </label>
+
+                        <label class="flex items-center justify-between p-4 border border-surface-variant rounded-lg cursor-pointer hover:bg-surface-container/50 transition-colors">
+                            <div class="flex items-center gap-3">
+                                <span class="material-symbols-outlined text-outline">sms</span>
+                                <div>
+                                    <span class="block font-body-md text-body-md font-medium text-deep-navy">SMS Alert</span>
+                                    <span class="block font-body-sm text-body-sm text-slate-gray">Send to registered mobile numbers</span>
+                                </div>
+                            </div>
+                            <div class="relative inline-block w-10 mr-2 align-middle select-none">
+                                <input class="toggle-checkbox absolute block w-5 h-5 rounded-full bg-white border-4 appearance-none cursor-pointer border-surface-variant transition-transform duration-200 ease-in-out"
+                                       type="checkbox" @bind="_smsEnabled" />
+                                <div class="toggle-label block overflow-hidden h-5 rounded-full bg-surface-variant cursor-pointer"></div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mt-8 pt-6 border-t border-surface-variant flex justify-end">
+                    <button class="bg-deep-navy text-on-primary font-label-md text-label-md uppercase px-6 py-3 rounded-lg hover:bg-primary transition-colors" @onclick="SaveAlerts">
+                        Save Settings
+                    </button>
+                </div>
+            </section>
+        </div>
+
+        <!-- Billing Contact -->
+        <div class="lg:col-span-4 space-y-6">
+            <section class="bg-surface-container-lowest border-t-2 border-warm-gold rounded-lg p-6 shadow-[0_12px_32px_-4px_rgba(31,56,100,0.05)] border border-surface-variant">
+                <div class="border-b border-surface-variant pb-4 mb-6">
+                    <h2 class="font-headline-md text-headline-md text-deep-navy">Billing Contact</h2>
+                </div>
+                <p class="font-body-sm text-body-sm text-slate-gray mb-6">Designate a specific contact to receive automated invoices and funding receipts.</p>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block font-label-sm text-label-sm text-deep-navy uppercase mb-2">Contact Name</label>
+                        <input class="block w-full px-3 py-2 border border-surface-variant rounded-lg bg-surface-container-lowest font-body-md text-body-md text-on-surface focus:ring-1 focus:ring-deep-navy focus:border-deep-navy outline-none transition-colors"
+                               @bind="_billingName" type="text" />
+                    </div>
+                    <div>
+                        <label class="block font-label-sm text-label-sm text-deep-navy uppercase mb-2">Email Address</label>
+                        <input class="block w-full px-3 py-2 border border-surface-variant rounded-lg bg-surface-container-lowest font-body-md text-body-md text-on-surface focus:ring-1 focus:ring-deep-navy focus:border-deep-navy outline-none transition-colors"
+                               @bind="_billingEmail" type="email" />
+                    </div>
+                    <div class="pt-4">
+                        <button class="w-full bg-transparent border-[1.5px] border-deep-navy text-deep-navy font-label-md text-label-md uppercase px-4 py-2 rounded-lg hover:bg-deep-navy hover:text-on-primary transition-colors" @onclick="SaveBilling">
+                            Update Contact
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+
+@code {
+    private decimal _threshold = 10000;
+    private bool _emailEnabled = true;
+    private bool _smsEnabled = false;
+    private string _billingName = "Finance Department";
+    private string _billingEmail = "billing@organization.com";
+    private string? _message;
+
+    private void SaveAlerts()
+    {
+        // TODO: Persist to backend
+        _message = "Alert settings saved successfully.";
+        _ = ClearMessage();
+    }
+
+    private void SaveBilling()
+    {
+        // TODO: Persist to backend
+        _message = "Billing contact updated.";
+        _ = ClearMessage();
+    }
+
+    private async Task ClearMessage()
+    {
+        await Task.Delay(3000);
+        _message = null;
+        StateHasChanged();
+    }
+}

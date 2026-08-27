@@ -1,0 +1,192 @@
+@page "/wallet/topup"
+@layout DashboardLayout
+@rendermode InteractiveServer
+@inject ApiClient Api
+
+<PageTitle>Add Funds — TruvoID</PageTitle>
+
+<div class="px-margin-mobile md:px-margin-desktop py-8 md:py-12 flex-1 max-w-5xl mx-auto w-full">
+
+    <div class="mb-section-gap">
+        <h1 class="font-headline-lg text-headline-lg text-deep-navy mb-2">Replenish Balance</h1>
+        <p class="font-body-md text-body-md text-slate-gray">Select an amount and preferred payment method to add funds to your institutional account.</p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+
+        <!-- Left: Input & Selection -->
+        <div class="lg:col-span-8 flex flex-col gap-10">
+
+            <!-- Amount Selection -->
+            <section class="bg-paper-white p-8 rounded-lg border-t-2 border-warm-gold border border-surface-variant shadow-[0_12px_32px_-4px_rgba(31,56,100,0.05)]">
+                <h3 class="font-label-sm text-label-sm text-deep-navy uppercase mb-6 tracking-widest">Select Amount</h3>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <button class="py-4 border rounded-lg text-center transition-all group @(_amount == 50000 ? "border-2 border-deep-navy bg-surface-bright shadow-sm" : "border-outline-variant hover:border-deep-navy hover:bg-surface")"
+                            @onclick='() => SetAmount(50000)'>
+                        <span class="block font-headline-md text-headline-md text-deep-navy">₦50,000</span>
+                        <span class="block font-label-sm text-label-sm text-slate-gray mt-1">Standard</span>
+                    </button>
+                    <button class="py-4 border rounded-lg text-center transition-all relative overflow-hidden @(_amount == 100000 ? "border-2 border-deep-navy bg-surface-bright shadow-sm" : "border-outline-variant hover:border-deep-navy hover:bg-surface")"
+                            @onclick='() => SetAmount(100000)'>
+                        @if (_amount != 100000)
+                        {
+                            <div class="absolute top-0 right-0 bg-deep-navy text-paper-white font-label-sm text-[9px] px-2 py-0.5 rounded-bl">POPULAR</div>
+                        }
+                        <span class="block font-headline-md text-headline-md text-deep-navy">₦100,000</span>
+                        <span class="block font-label-sm text-label-sm text-slate-gray mt-1">Recommended</span>
+                    </button>
+                    <button class="py-4 border rounded-lg text-center transition-all group @(_amount == 500000 ? "border-2 border-deep-navy bg-surface-bright shadow-sm" : "border-outline-variant hover:border-deep-navy hover:bg-surface")"
+                            @onclick='() => SetAmount(500000)'>
+                        <span class="block font-headline-md text-headline-md text-deep-navy">₦500,000</span>
+                        <span class="block font-label-sm text-label-sm text-slate-gray mt-1">Enterprise</span>
+                    </button>
+                </div>
+
+                <div>
+                    <label class="block font-label-sm text-label-sm text-deep-navy mb-2">Custom Amount (₦)</label>
+                    <div class="relative">
+                        <span class="absolute left-4 top-1/2 -translate-y-1/2 font-body-lg text-body-lg text-slate-gray">₦</span>
+                        <input class="w-full pl-10 pr-4 py-3 border border-outline-variant rounded bg-transparent font-body-lg text-body-lg text-deep-navy focus:border-deep-navy focus:ring-1 focus:ring-deep-navy outline-none transition-all placeholder:text-outline-variant"
+                               @bind="_amount" type="number" min="50000" step="10000" />
+                    </div>
+                    <p class="mt-2 font-body-sm text-body-sm text-slate-gray">Minimum deposit: ₦50,000</p>
+                </div>
+            </section>
+
+            <!-- Payment Method -->
+            <section class="bg-paper-white p-8 rounded-lg border border-surface-variant shadow-[0_12px_32px_-4px_rgba(31,56,100,0.05)]">
+                <h3 class="font-label-sm text-label-sm text-deep-navy uppercase mb-6 tracking-widest">Payment Method</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Paystack -->
+                    <label class="cursor-pointer">
+                        <input class="peer sr-only" type="radio" name="payment" value="paystack" checked="@(_paymentMethod == "paystack")" @onchange='() => _paymentMethod = "paystack"' />
+                        <div class="p-6 border border-outline-variant rounded-lg peer-checked:border-deep-navy peer-checked:bg-surface-bright flex items-center justify-between transition-all">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 bg-[#00C3F7] rounded flex items-center justify-center">
+                                    <span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">account_balance</span>
+                                </div>
+                                <div>
+                                    <span class="block font-label-md text-label-md text-deep-navy">Paystack</span>
+                                    <span class="block font-body-sm text-body-sm text-slate-gray">Card, Bank Transfer</span>
+                                </div>
+                            </div>
+                            <span class="material-symbols-outlined text-deep-navy opacity-0 peer-checked:opacity-100 transition-opacity" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                        </div>
+                    </label>
+                    <!-- Flutterwave -->
+                    <label class="cursor-pointer">
+                        <input class="peer sr-only" type="radio" name="payment" value="flutterwave" checked="@(_paymentMethod == "flutterwave")" @onchange='() => _paymentMethod = "flutterwave"' />
+                        <div class="p-6 border border-outline-variant rounded-lg peer-checked:border-deep-navy peer-checked:bg-surface-bright flex items-center justify-between transition-all">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 bg-[#F5A623] rounded flex items-center justify-center">
+                                    <span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">flash_on</span>
+                                </div>
+                                <div>
+                                    <span class="block font-label-md text-label-md text-deep-navy">Flutterwave</span>
+                                    <span class="block font-body-sm text-body-sm text-slate-gray">Card, USSD, Bank</span>
+                                </div>
+                            </div>
+                            <span class="material-symbols-outlined text-deep-navy opacity-0 peer-checked:opacity-100 transition-opacity" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                        </div>
+                    </label>
+                </div>
+            </section>
+        </div>
+
+        <!-- Right: Summary -->
+        <div class="lg:col-span-4">
+            <div class="bg-surface-container-low p-6 rounded-lg border border-surface-variant sticky top-28">
+                <h3 class="font-label-sm text-label-sm text-deep-navy uppercase mb-6 tracking-widest border-b border-outline-variant pb-4">Transaction Summary</h3>
+
+                <div class="flex flex-col gap-4 mb-6 border-b border-outline-variant pb-6">
+                    <div class="flex justify-between items-center">
+                        <span class="font-body-md text-body-md text-slate-gray">Funding Amount</span>
+                        <span class="font-label-md text-label-md text-deep-navy">₦@_amount.ToString("N2")</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="font-body-md text-body-sm text-slate-gray">Processing Fee (1.5%)</span>
+                        <span class="font-label-md text-label-md text-deep-navy">₦@_processingFee.ToString("N2")</span>
+                    </div>
+                </div>
+
+                <div class="flex justify-between items-end mb-8">
+                    <span class="font-label-sm text-label-sm text-deep-navy uppercase">Total to Pay</span>
+                    <span class="font-headline-lg text-headline-lg text-deep-navy font-bold tracking-tight">₦@_total.ToString("N0")</span>
+                </div>
+
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 font-body-sm text-body-sm">@_errorMessage</div>
+                }
+
+                <button class="w-full bg-warm-gold text-paper-white py-4 rounded font-label-md text-label-md uppercase tracking-wider hover:bg-secondary transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                        disabled="@(_isLoading || _amount < 50000)" @onclick="HandleTopup">
+                    @if (_isLoading)
+                    {
+                        <span>Processing...</span>
+                    }
+                    else
+                    {
+                        <span>Proceed to Payment</span>
+                        <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+                    }
+                </button>
+
+                <div class="mt-4 flex items-start gap-2 text-slate-gray">
+                    <span class="material-symbols-outlined text-[16px] mt-0.5">lock</span>
+                    <p class="font-body-sm text-body-sm text-[12px] leading-tight">Payments are securely processed. Your financial information is encrypted and never stored on our servers.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private decimal _amount = 100000;
+    private string _paymentMethod = "paystack";
+    private bool _isLoading;
+    private string? _errorMessage;
+
+    private decimal _processingFee => Math.Round(_amount * 0.015m, 2);
+    private decimal _total => _amount + _processingFee;
+
+    private void SetAmount(decimal amount) => _amount = amount;
+
+    private async Task HandleTopup()
+    {
+        if (_amount < 50000) return;
+
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            var response = await Api.PostAsync<TopupInitiateResponse>("/v1/wallet/topup/initiate", new
+            {
+                amount = _amount,
+                paymentProvider = _paymentMethod
+            });
+
+            if (response?.AuthorizationUrl is not null)
+            {
+                // In production: redirect to payment gateway checkout
+                // For now, show success
+                _errorMessage = null;
+                // NavigationManager.NavigateTo(response.AuthorizationUrl);
+            }
+            else
+            {
+                _errorMessage = "Failed to initiate payment. Please try again.";
+            }
+        }
+        catch (Exception)
+        {
+            _errorMessage = "Unable to connect to payment service.";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}
