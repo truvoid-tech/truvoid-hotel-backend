@@ -62,6 +62,19 @@ public class ApiClient
         return await response.Content.ReadFromJsonAsync<T>(JsonOptions);
     }
 
+    public async Task PostAsync(string url, object body)
+    {
+        var request = await CreateRequestAsync(HttpMethod.Post, url, body);
+        var response = await _http.SendAsync(request);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            await _tokenService.ClearTokensAsync();
+            _nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task<T?> PostAsync<T>(string url, object body)
     {
         var request = await CreateRequestAsync(HttpMethod.Post, url, body);
@@ -84,6 +97,19 @@ public class ApiClient
         return await _http.SendAsync(request);
     }
 
+    public async Task PutAsync(string url, object body)
+    {
+        var request = await CreateRequestAsync(HttpMethod.Put, url, body);
+        var response = await _http.SendAsync(request);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            await _tokenService.ClearTokensAsync();
+            _nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task<T?> PutAsync<T>(string url, object body)
     {
         var request = await CreateRequestAsync(HttpMethod.Put, url, body);
@@ -104,6 +130,19 @@ public class ApiClient
     {
         var request = await CreateRequestAsync(HttpMethod.Put, url, body);
         return await _http.SendAsync(request);
+    }
+
+    public async Task DeleteAsync(string url)
+    {
+        var request = await CreateRequestAsync(HttpMethod.Delete, url);
+        var response = await _http.SendAsync(request);
+        if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            await _tokenService.ClearTokensAsync();
+            _nav.NavigateTo("/login", forceLoad: true);
+            return;
+        }
+        response.EnsureSuccessStatusCode();
     }
 
     public async Task<T?> DeleteAsync<T>(string url)
