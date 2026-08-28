@@ -129,7 +129,8 @@ public class VerificationService : IVerificationService
             var apiKey = _configuration["IDACCESS_API_KEY"]
                 ?? _configuration["IDACCESS-API-KEY"]
                 ?? Environment.GetEnvironmentVariable("IDACCESS_API_KEY")
-                ?? Environment.GetEnvironmentVariable("IDACCESS-API-KEY");
+                ?? Environment.GetEnvironmentVariable("IDACCESS-API-KEY")
+                ?? FindEnvVarContaining("IDACCESS_API_KEY");
             if (string.IsNullOrEmpty(apiKey))
             {
                 throw new InvalidOperationException($"IDACCESS_API_KEY not configured. Checked: IDACCESS_API_KEY, IDACCESS-API-KEY in both IConfiguration and Environment.");
@@ -284,6 +285,20 @@ public class VerificationService : IVerificationService
             ErrorCode = call.Status == VerificationStatus.Error ? ErrorCodes.UpstreamError : null,
             ErrorMessage = call.ErrorMessage
         };
+    }
+
+    
+    private static string? FindEnvVarContaining(string partialName)
+    {
+        foreach (var key in Environment.GetEnvironmentVariables().Keys)
+        {
+            var keyStr = key.ToString()!.Trim();
+            if (keyStr.StartsWith(partialName, StringComparison.OrdinalIgnoreCase))
+            {
+                return Environment.GetEnvironmentVariable(key.ToString()!);
+            }
+        }
+        return null;
     }
 
     private static string HashSubjectRef(string subjectRef)
