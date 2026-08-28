@@ -455,4 +455,104 @@ public class AdminService : IAdminService
             CreatedAt = e.CreatedAt
         }).ToList();
     }
+
+    // ──────────────────────────── Role Management ────────────────────────────
+
+    public async Task<AdminUserDto> UpdateAdminRoleAsync(Guid userId, string newRole, CancellationToken ct = default)
+    {
+        var user = await _db.Users.Find(u => u.Id == userId).FirstOrDefaultAsync(ct);
+        if (user is null)
+            throw new InvalidOperationException("User not found.");
+
+        if (!Enum.TryParse<UserRole>(newRole, true, out var role))
+            throw new InvalidOperationException($"Invalid role: {newRole}. Valid roles: Admin, Staff.");
+
+        // Prevent changing PlatformAdmin role
+        if (user.Role == UserRole.PlatformAdmin)
+            throw new InvalidOperationException("Cannot change the role of a PlatformAdmin.");
+
+        var update = Builders<User>.Update.Set(u => u.Role, role);
+        await _db.Users.UpdateOneAsync(u => u.Id == userId, update, cancellationToken: ct);
+
+        await _db.AuditLogs.InsertOneAsync(new AuditLog
+        {
+            ActorType = "PlatformAdmin",
+            Action = AuditAction.RoleChanged,
+            Entity = "User",
+            EntityId = userId,
+            DetailsJson = $"{{\"role\":\"{role}\"}}"
+        }, cancellationToken: ct);
+
+        return new AdminUserDto
+        {
+            UserId = user.Id,
+            Email = user.Email,
+            FullName = user.FullName ?? "",
+            Role = role.ToString(),
+            IsActive = user.Status == UserStatus.Active,
+            CreatedAt = user.CreatedAt,
+            LastLoginAt = user.LastLoginAt
+        };
+    }
+
+    // ──────────────────────────── Low Balance Alerts ────────────────────────────
+
+    public async Task<List<LowBalanceAlertDto>> GetLowBalanceAlertsAsync(decimal threshold = 5000m, CancellationToken ct = default)
+    {
+        var institutions = await _db.Institutions.Find(_ => true).ToListAsync(ct);
+        var alerts = new List<LowBalanceAlertDto>();
+
+        foreach (var inst in institutions)
+        {
+            // Get wallet balance from latest ledger entry
+            var entries = await _db.WalletLedgerEntries
+                .Find(e => e.InstitutionId == inst.Id)
+                .SortByDescending(e => e.CreatedAt)
+                .Limit(1)
+                .ToListAsync(ct);
+
+            var balance = entries.FirstOrDefault()?.BalanceAfter ?? 0m;
+
+            // Get calls in last 30 days
+            var thirtyDaysAgo = DateTime.UtcNow.AddDays(-30);
+            var callsCount = await _db.VerificationCalls
+                .CountDocumentsAsync(
+                    c => c.InstitutionId == inst.Id && c.CreatedAt >= thirtyDaysAgo);
+
+            var avgDailySpend = callsCount > 0 ? Math.Round(balance / 30m, 2) : 0m;
+
+            if (balance <= threshold)
+            {
+                alerts.Add(new LowBalanceAlertDto
+                {
+                    InstitutionId = inst.Id.ToString(),
+                    InstitutionName = inst.Name,
+                    ContactEmail = inst.ContactEmail ?? "",
+                    CurrentBalance = balance,
+                    AlertThreshold = threshold,
+                    CallsLast30Days = (int)callsCount,
+                    AvgDailySpend = avgDailySpend
+                });
+            }
+        }
+
+        return alerts.OrderByDescending(a => a.CurrentBalance).ToList();
+    }
+
+    public async Task SendLowBalanceNotificationAsync(Guid institutionId, CancellationToken ct = default)
+    {
+        var inst = await _db.Institutions.Find(i => i.Id == institutionId).FirstOrDefaultAsync(ct);
+        if (inst is null)
+            throw new InvalidOperationException("Institution not found.");
+
+        // Log the notification action
+        await _db.AuditLogs.InsertOneAsync(new AuditLog
+        {
+            ActorType = "PlatformAdmin",
+            Action = AuditAction.Notified,
+            Entity = "Institution",
+            EntityId = institutionId,
+            DetailsJson = $"{{\"type\":\"low_balance_alert\",\"email\":\"{inst.ContactEmail ?? ""}\"}}"
+        }, cancellationToken: ct);
+    }
 }

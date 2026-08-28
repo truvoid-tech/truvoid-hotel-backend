@@ -1,3 +1,7 @@
+using System.Net.Http.Headers;
+using Microsoft.Extensions.Configuration;
+using System.Net.Http;
+using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -16,17 +20,24 @@ public class VerificationService : IVerificationService
     private readonly IWalletService _walletService;
     private readonly IPricingService _pricingService;
     private readonly IAuditService _auditService;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IConfiguration _configuration;
+    private const string IdaccessBaseUrl = "https://api.idaccess.info/v1";
 
     public VerificationService(
         MongoDbContext db,
         IWalletService walletService,
         IPricingService pricingService,
-        IAuditService auditService)
+        IAuditService auditService,
+        IHttpClientFactory httpClientFactory,
+        IConfiguration configuration)
     {
         _db = db;
         _walletService = walletService;
         _pricingService = pricingService;
         _auditService = auditService;
+        _httpClientFactory = httpClientFactory;
+        _configuration = configuration;
     }
 
     public async Task<VerificationResponse> VerifyAsync(
@@ -73,7 +84,7 @@ public class VerificationService : IVerificationService
             {
                 Status = "error",
                 ErrorCode = ErrorCodes.InsufficientBalance,
-                ErrorMessage = $"Insufficient wallet balance. Required: ₦{price:N2}"
+                ErrorMessage = $"Insufficient wallet balance. Required: \u20A6{price:N2}"
             };
         }
 
@@ -112,12 +123,110 @@ public class VerificationService : IVerificationService
         var linkUpdate = Builders<VerificationCall>.Update.Set(c => c.LedgerEntryId, debitResult.LedgerEntryId);
         await _db.VerificationCalls.UpdateOneAsync(c => c.Id == call.Id, linkUpdate, cancellationToken: ct);
 
-        // 7. Call NIMC partner API (stubbed for now)
-        var resultUpdate = Builders<VerificationCall>.Update
-            .Set(c => c.Status, VerificationStatus.Match)
-            .Set(c => c.MatchedFieldsJson, JsonSerializer.Serialize(new { name = "Sample Match", dob = "1990-01-01", phone = "08012345678", gender = "Male" }))
-            .Set(c => c.UpdatedAt, DateTime.UtcNow);
-        await _db.VerificationCalls.UpdateOneAsync(c => c.Id == call.Id, resultUpdate, cancellationToken: ct);
+        // 7. Call IDaccess partner API
+        try
+        {
+            var apiKey = _configuration["IDACCESS_API_KEY"];
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                throw new InvalidOperationException("IDACCESS_API_KEY not configured.");
+            }
+
+            var client = _httpClientFactory.CreateClient("idaccess");
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+            // Determine endpoint based on verification type
+            var endpoint = type switch
+            {
+                VerificationType.Nin => "nin/verify",
+                VerificationType.Bvn => "bvn/verify",
+                VerificationType.Phone => "phone/verify",
+                _ => throw new NotSupportedException($"Verification type {type} is not supported.")
+            };
+
+            var requestBody = new { number = subjectRef };
+            var httpResponse = await client.PostAsJsonAsync($"{IdaccessBaseUrl}/{endpoint}", requestBody, ct);
+            var responseContent = await httpResponse.Content.ReadAsStringAsync(ct);
+
+            if (httpResponse.IsSuccessStatusCode)
+            {
+                var resultDoc = JsonDocument.Parse(responseContent);
+                var resultRoot = resultDoc.RootElement;
+
+                // Extract matched fields from IDaccess response
+                string? firstName = resultRoot.TryGetProperty("first_name", out var fn) ? fn.GetString() : null;
+                string? middleName = resultRoot.TryGetProperty("middle_name", out var mn) ? mn.GetString() : null;
+                string? surname = resultRoot.TryGetProperty("last_name", out var ln) ? ln.GetString() : null;
+
+                string? fullName = firstName;
+                if (!string.IsNullOrEmpty(surname))
+                    fullName = string.IsNullOrEmpty(firstName) ? surname : $"{firstName} {surname}";
+                if (!string.IsNullOrEmpty(middleName) && fullName != null)
+                    fullName = $"{fullName} {middleName}";
+
+                var dob = resultRoot.TryGetProperty("date_of_birth", out var dobProp) ? dobProp.GetString() : null;
+                var phone = resultRoot.TryGetProperty("phone_number", out var phProp) ? phProp.GetString() : null;
+                var gender = resultRoot.TryGetProperty("gender", out var gProp) ? gProp.GetString() : null;
+                var photo = resultRoot.TryGetProperty("photo", out var photoProp) ? photoProp.GetString() : null;
+
+                var matchedData = new
+                {
+                    name = fullName,
+                    dob,
+                    phone,
+                    gender,
+                    photo
+                };
+
+                var resultUpdate = Builders<VerificationCall>.Update
+                    .Set(c => c.Status, VerificationStatus.Match)
+                    .Set(c => c.MatchedFieldsJson, JsonSerializer.Serialize(matchedData))
+                    .Set(c => c.RawResponseJson, responseContent)
+                    .Set(c => c.UpdatedAt, DateTime.UtcNow);
+                await _db.VerificationCalls.UpdateOneAsync(c => c.Id == call.Id, resultUpdate, cancellationToken: ct);
+            }
+            else
+            {
+                // Upstream returned an error
+                var errorMessage = "Upstream verification failed.";
+                try
+                {
+                    var errDoc = JsonDocument.Parse(responseContent);
+                    if (errDoc.RootElement.TryGetProperty("message", out var msgProp))
+                        errorMessage = msgProp.GetString() ?? errorMessage;
+                }
+                catch { }
+
+                var status = responseContent.Contains("no match", StringComparison.OrdinalIgnoreCase)
+                    ? VerificationStatus.NoMatch
+                    : VerificationStatus.Error;
+
+                var errorUpdate = Builders<VerificationCall>.Update
+                    .Set(c => c.Status, status)
+                    .Set(c => c.ErrorMessage, errorMessage)
+                    .Set(c => c.RawResponseJson, responseContent)
+                    .Set(c => c.UpdatedAt, DateTime.UtcNow);
+                await _db.VerificationCalls.UpdateOneAsync(c => c.Id == call.Id, errorUpdate, cancellationToken: ct);
+
+                // Reverse debit on upstream failure
+                if (status == VerificationStatus.Error)
+                {
+                    await _walletService.CreditAsync(institutionId, price, $"Refund: {type} upstream error", call.Id.ToString(), ct);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // API call failed entirely
+            var errorUpdate = Builders<VerificationCall>.Update
+                .Set(c => c.Status, VerificationStatus.Error)
+                .Set(c => c.ErrorMessage, $"Upstream API error: {ex.Message}")
+                .Set(c => c.UpdatedAt, DateTime.UtcNow);
+            await _db.VerificationCalls.UpdateOneAsync(c => c.Id == call.Id, errorUpdate, cancellationToken: ct);
+
+            // Reverse debit
+            await _walletService.CreditAsync(institutionId, price, $"Refund: {type} API error", call.Id.ToString(), ct);
+        }
 
         // 8. Audit log
         await _auditService.LogAsync(
@@ -131,7 +240,6 @@ public class VerificationService : IVerificationService
         // Fetch updated call for response
         var updatedCall = await _db.VerificationCalls.Find(c => c.Id == call.Id).FirstOrDefaultAsync(ct);
 
-        // Fetch balance after
         var balanceAfter = debitResult.BalanceAfter;
         var response = MapToResponse(updatedCall!);
         response.WalletBalanceAfter = balanceAfter;
@@ -152,7 +260,8 @@ public class VerificationService : IVerificationService
                     Name = root.TryGetProperty("name", out var nProp) ? nProp.GetString() : null,
                     DateOfBirth = root.TryGetProperty("dob", out var dProp) ? dProp.GetString() : null,
                     PhoneNumber = root.TryGetProperty("phone", out var pProp) ? pProp.GetString() : null,
-                    Gender = root.TryGetProperty("gender", out var gProp) ? gProp.GetString() : null
+                    Gender = root.TryGetProperty("gender", out var gProp) ? gProp.GetString() : null,
+                    PhotoUrl = root.TryGetProperty("photo", out var photoProp) ? photoProp.GetString() : null
                 };
             }
             catch { }

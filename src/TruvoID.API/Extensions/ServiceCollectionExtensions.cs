@@ -45,6 +45,13 @@ public static class ServiceCollectionExtensions
             Console.WriteLine("[Startup] Redis not configured or is localhost — skipping.");
         }
 
+        // HTTP Client for IDaccess API
+        services.AddHttpClient("idaccess", client =>
+        {
+            client.BaseAddress = new Uri("https://api.idaccess.info/v1");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        });
+
         // Business services
         services.AddScoped<IWalletService, WalletService>();
         services.AddScoped<IVerificationService, VerificationService>();

@@ -12,5 +12,7 @@ public enum AuditAction
     ApiKeyGenerated = 7,
     ApiKeyRevoked = 8,
     Login = 9,
-    Logout = 10
+    Logout = 10,
+    Notified = 11,
+    RoleChanged = 12
 }

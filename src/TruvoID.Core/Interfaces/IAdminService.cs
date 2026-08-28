@@ -27,7 +27,12 @@ public interface IAdminService
     // Admin Management
     Task<List<AdminUserDto>> GetAdminsAsync(CancellationToken ct = default);
     Task<AdminUserDto> InviteAdminAsync(InviteAdminRequest request, CancellationToken ct = default);
+    Task<AdminUserDto> UpdateAdminRoleAsync(Guid userId, string newRole, CancellationToken ct = default);
 
     // Audit Log
     Task<List<AuditLogEntryDto>> GetAuditLogAsync(int page = 1, int pageSize = 50, CancellationToken ct = default);
+
+    // Low Balance Alerts
+    Task<List<LowBalanceAlertDto>> GetLowBalanceAlertsAsync(decimal threshold = 5000m, CancellationToken ct = default);
+    Task SendLowBalanceNotificationAsync(Guid institutionId, CancellationToken ct = default);
 }

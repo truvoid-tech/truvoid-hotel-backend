@@ -14,6 +14,7 @@ public class VerificationCall : BaseEntity
     public decimal AmountCharged { get; set; }
     public string? IdempotencyKey { get; set; }
     public string? MatchedFieldsJson { get; set; }
+    public string? RawResponseJson { get; set; }
     public string? ErrorMessage { get; set; }
     public string? UpstreamReferenceId { get; set; }
 }

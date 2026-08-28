@@ -194,4 +194,60 @@ public class AdminController : ControllerBase
         var log = await _adminService.GetAuditLogAsync(page, pageSize, ct);
         return Ok(log);
     }
+
+    // ──────────────────────────── Role Management ────────────────────────────
+
+    /// <summary>
+    /// Update an admin user's role. PlatformAdmin cannot be downgraded.
+    /// </summary>
+    [HttpPut("admins/{userId:guid}/role")]
+    [ProducesResponseType(typeof(AdminUserDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateAdminRole(Guid userId, [FromBody] UpdateRoleRequest request, CancellationToken ct)
+    {
+        try
+        {
+            var admin = await _adminService.UpdateAdminRoleAsync(userId, request.Role, ct);
+            return Ok(admin);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { code = "INVALID_ROLE", message = ex.Message });
+        }
+    }
+
+    // ──────────────────────────── Low Balance Alerts ────────────────────────────
+
+    /// <summary>
+    /// Get all institutions with wallet balance below the specified threshold.
+    /// </summary>
+    [HttpGet("alerts/low-balance")]
+    [ProducesResponseType(typeof(List<LowBalanceAlertDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetLowBalanceAlerts(
+        [FromQuery] decimal threshold = 5000m,
+        CancellationToken ct = default)
+    {
+        var alerts = await _adminService.GetLowBalanceAlertsAsync(threshold, ct);
+        return Ok(alerts);
+    }
+
+    /// <summary>
+    /// Send a low-balance notification to a specific institution admin.
+    /// </summary>
+    [HttpPost("alerts/low-balance/{institutionId:guid}/notify")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SendLowBalanceNotification(Guid institutionId, CancellationToken ct)
+    {
+        try
+        {
+            await _adminService.SendLowBalanceNotificationAsync(institutionId, ct);
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+    }
 }

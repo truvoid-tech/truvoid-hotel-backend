@@ -127,3 +127,21 @@ public record AuditLogEntryDto
     public string? DetailsJson { get; init; }
     public DateTime CreatedAt { get; init; }
 }
+
+// ─── Low Balance Alert DTOs ───
+public record LowBalanceAlertDto
+{
+    public string InstitutionId { get; init; } = string.Empty;
+    public string InstitutionName { get; init; } = string.Empty;
+    public string ContactEmail { get; init; } = string.Empty;
+    public decimal CurrentBalance { get; init; }
+    public decimal AlertThreshold { get; init; }
+    public int CallsLast30Days { get; init; }
+    public decimal AvgDailySpend { get; init; }
+}
+
+// ─── Role Management DTOs ───
+public record UpdateRoleRequest
+{
+    public string Role { get; init; } = string.Empty;
+}
