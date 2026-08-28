@@ -64,9 +64,10 @@ public class MongoDbContext
                 .Descending(v => v.CreatedAt),
             new CreateIndexOptions { Name = "ix_calls_inst_created" }));
 
+        try { await VerificationCalls.Indexes.DropOneAsync("ix_calls_idempotency"); } catch { /* index may not exist */ }
         await VerificationCalls.Indexes.CreateOneAsync(new CreateIndexModel<VerificationCall>(
             Builders<VerificationCall>.IndexKeys.Ascending(v => v.IdempotencyKey),
-            new CreateIndexOptions { Sparse = true, Unique = true, Name = "ix_calls_idempotency" }));
+            new CreateIndexOptions { Sparse = true, Unique = false, Name = "ix_calls_idempotency" }));
 
         await PricingRates.Indexes.CreateOneAsync(new CreateIndexModel<PricingRate>(
             Builders<PricingRate>.IndexKeys
