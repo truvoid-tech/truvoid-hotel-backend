@@ -1,4 +1,4 @@
-# Build stage — TruvoID API v2.4.2 (cache-bust: 2026-08-29T10:00:00Z)
+# Build stage — TruvoID API v3.1.1 (cache-bust: 2026-08-28T14:00:00Z)
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
