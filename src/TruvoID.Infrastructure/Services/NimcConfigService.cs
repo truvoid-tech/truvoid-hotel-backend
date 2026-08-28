@@ -9,8 +9,13 @@ namespace TruvoID.Infrastructure.Services;
 public class NimcConfigService : INimcConfigService
 {
     private readonly MongoDbContext _db;
+    private readonly IConfiguration _config;
 
-    public NimcConfigService(MongoDbContext db) => _db = db;
+    public NimcConfigService(MongoDbContext db, IConfiguration config)
+    {
+        _db = db;
+        _config = config;
+    }
 
     public async Task<NimcEnvironmentDto> GetActiveEnvironmentAsync(CancellationToken ct = default)
     {
@@ -37,4 +42,7 @@ public class NimcConfigService : INimcConfigService
             }, cancellationToken: ct);
         }
     }
+
+    public string GetApiBaseUrl() => "https://api.idaccess.info/v1";
+    public string GetApiKey() => _config["NIMC_API_KEY"] ?? "";
 }
