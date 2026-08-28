@@ -207,7 +207,7 @@ public class VerificationService : IVerificationService
             else
             {
                 // Upstream returned an error
-                var errorMessage = $"Upstream returned HTTP {(int)httpResponse.StatusCode}.";
+                var errorMessage = $"Upstream returned HTTP {(int)httpResponse.StatusCode}. Raw: {responseContent}";
                 try
                 {
                     var errDoc = JsonDocument.Parse(responseContent);
