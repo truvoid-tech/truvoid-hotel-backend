@@ -13,12 +13,21 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddTruvoIDServices(this IServiceCollection services, IConfiguration configuration)
     {
-        // PostgreSQL
+        // PostgreSQL — auto-append Ssl Mode=Require for Neon if not already present
+        var connectionString = configuration.GetConnectionString("DefaultConnection") ?? "";
+        if (!connectionString.Contains("Ssl Mode", StringComparison.OrdinalIgnoreCase)
+            && !connectionString.Contains("SslMode", StringComparison.OrdinalIgnoreCase))
+        {
+            connectionString += ";Ssl Mode=Require";
+            Console.WriteLine("[Startup] Auto-appended Ssl Mode=Require to connection string for Neon compatibility.");
+        }
+
+        Console.WriteLine($"[Startup] Connecting to database: {ExtractHost(connectionString)}");
+
         services.AddDbContext<TruvoIDDbContext>(options =>
-            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
+            options.UseNpgsql(connectionString));
 
         // Redis — only connect if a real (non-localhost) URL is provided
-        // In Railway, set ConnectionStrings__Redis or leave it empty to skip
         var redisConnection = configuration.GetConnectionString("Redis");
         var isRedisConfigured = !string.IsNullOrWhiteSpace(redisConnection)
                                 && !redisConnection.Contains("localhost", StringComparison.OrdinalIgnoreCase);
@@ -38,7 +47,7 @@ public static class ServiceCollectionExtensions
         }
         else
         {
-            Console.WriteLine("[Startup] Redis not configured or is localhost — skipping. Rate limiting and balance cache disabled.");
+            Console.WriteLine("[Startup] Redis not configured or is localhost — skipping.");
         }
 
         // Business services
@@ -53,5 +62,16 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAdminService, AdminService>();
 
         return services;
+    }
+
+    private static string ExtractHost(string connectionString)
+    {
+        foreach (var part in connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var trimmed = part.Trim();
+            if (trimmed.StartsWith("Host=", StringComparison.OrdinalIgnoreCase))
+                return trimmed;
+        }
+        return "(host not found in connection string)";
     }
 }
