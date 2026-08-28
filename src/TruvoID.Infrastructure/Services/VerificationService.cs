@@ -139,6 +139,8 @@ public class VerificationService : IVerificationService
             var upstreamIdempotencyKey = idempotencyKey ?? $"req_{call.Id:N}";
             client.DefaultRequestHeaders.Remove("Idempotency-Key");
             client.DefaultRequestHeaders.Add("Idempotency-Key", upstreamIdempotencyKey);
+            client.DefaultRequestHeaders.Remove("X-Request-Reason");
+            client.DefaultRequestHeaders.Add("X-Request-Reason", "KYC");
 
             // Determine endpoint and body field per IDaccess docs
             string endpoint = type switch
@@ -156,7 +158,7 @@ public class VerificationService : IVerificationService
                 _ => throw new NotSupportedException($"Verification type {type} is not supported.")
             };
 
-            var requestBody = new Dictionary<string, string> { { bodyField, subjectRef.Trim() }, { "requestReason", "KYC" } };
+            var requestBody = new Dictionary<string, string> { { bodyField, subjectRef.Trim() } };
             Console.WriteLine($"[VERIFY] Calling {IdaccessBaseUrl}/{endpoint}");
             var httpResponse = await client.PostAsJsonAsync($"{IdaccessBaseUrl}/{endpoint}", requestBody, ct);
             var responseContent = await httpResponse.Content.ReadAsStringAsync(ct);
