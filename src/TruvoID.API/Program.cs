@@ -47,7 +47,7 @@ builder.Services.AddAuthentication(options =>
 
 builder.Services.AddAuthorization();
 
-// CORS for dashboard SPA and external API consumers
+// CORS
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -58,20 +58,18 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Controllers
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
 var app = builder.Build();
 
-// Global exception handler — log errors instead of swallowing them
+// Global exception handler
 app.UseExceptionHandler(errorApp =>
 {
     errorApp.Run(async context =>
     {
         var exception = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
         Console.WriteLine($"[ERROR] {exception?.Message}");
-        Console.WriteLine($"[ERROR] {exception?.StackTrace}");
 
         context.Response.StatusCode = 500;
         context.Response.ContentType = "application/json";
@@ -85,38 +83,48 @@ app.UseExceptionHandler(errorApp =>
 });
 
 app.UseCors();
-
-// JWT authentication — must come before authorization
 app.UseAuthentication();
 app.UseAuthorization();
 
-// API key authentication (applies to /v1/* endpoints for API gateway consumers)
 app.UseWhen(
     context => context.Request.Path.StartsWithSegments("/v1"),
     appBuilder => appBuilder.UseMiddleware<ApiKeyAuthenticationMiddleware>());
 
 app.MapControllers();
 
-// ─── Seed database on startup ───
+// ─── Ensure database schema exists on startup ───
 try
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<TruvoIDDbContext>();
+    var conn = db.Database.GetDbConnection();
+    await conn.OpenAsync();
 
-    // Try migration first, fall back to EnsureCreated if migrations are missing
-    try
+    // Check if the users table exists
+    using (var checkCmd = conn.CreateCommand())
     {
-        await db.Database.MigrateAsync();
-        Console.WriteLine("[Startup] Database migrated successfully.");
-    }
-    catch (Exception migrateEx)
-    {
-        Console.WriteLine($"[Startup] MigrateAsync failed ({migrateEx.Message}). Trying EnsureCreated...");
+        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users'";
+        var count = (long)(await checkCmd.ExecuteScalarAsync() ?? 0);
 
-        // EnsureCreated creates the schema from the current model — no migration files needed
-        // Downside: won't apply future migrations, but works for initial setup
-        await db.Database.EnsureCreatedAsync();
-        Console.WriteLine("[Startup] Database created/verified via EnsureCreated.");
+        if (count == 0)
+        {
+            Console.WriteLine("[Startup] Users table not found. Dropping __EFMigrationsHistory and creating schema...");
+
+            // Drop the stale migration history so EnsureCreated works
+            using (var dropCmd = conn.CreateCommand())
+            {
+                dropCmd.CommandText = "DROP TABLE IF EXISTS \"__EFMigrationsHistory\" CASCADE";
+                await dropCmd.ExecuteNonQueryAsync();
+            }
+
+            // Create all tables from the DbContext model
+            await db.Database.EnsureCreatedAsync();
+            Console.WriteLine("[Startup] Schema created via EnsureCreated.");
+        }
+        else
+        {
+            Console.WriteLine("[Startup] Database schema already exists — skipping.");
+        }
     }
 
     await SeedData.SeedAsync(db);
@@ -124,9 +132,8 @@ try
 }
 catch (Exception ex)
 {
-    Console.WriteLine($"[Startup] Database setup FAILED: {ex.Message}");
+    Console.WriteLine($"[Startup] Database setup failed: {ex.Message}");
     Console.WriteLine($"[Startup] Stack trace: {ex.StackTrace}");
-    Console.WriteLine("[Startup] The API will start anyway — database operations will fail until the DB is accessible.");
 }
 
 Console.WriteLine($"[Startup] TruvoID API listening on port {port}");
