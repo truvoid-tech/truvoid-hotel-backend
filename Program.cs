@@ -2,14 +2,21 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.IdentityModel.Tokens;
+using MongoDB.Driver;
 using TruvoID.API.Extensions;
-using TruvoID.API.Middleware;
 using TruvoID.Components;
 using TruvoID.Components.Services;
+using TruvoID.Domain.Entities;
+using TruvoID.Domain.Enums;
+using TruvoID.Infrastructure.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Railway binds to the PORT env var
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+builder.WebHost.UseUrls($"http://+:{port}");
+
+// Blazor components
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
@@ -37,7 +44,7 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = jwtSettings["Issuer"] ?? "TruvoID",
         ValidAudience = jwtSettings["Audience"] ?? "TruvoID",
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
-        ClockSkew = TimeSpan.FromMinutes(1) // Reduce default 5min skew
+        ClockSkew = TimeSpan.FromMinutes(1)
     };
 });
 
@@ -50,7 +57,7 @@ builder.Services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredServ
 builder.Services.AddScoped<ApiClient>();
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri("/") });
 
-// CORS for dashboard SPA and external API consumers
+// CORS
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -61,17 +68,52 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Add TruvoID services (DB, Redis, business services)
+// Add TruvoID services (MongoDB, Redis, business services)
 builder.Services.AddTruvoIDServices(builder.Configuration);
 
 var app = builder.Build();
 
-// Seed default data (pricing rates) on first run
-using (var scope = app.Services.CreateScope())
+// ─── MongoDB: Create indexes + seed data on startup ───
+try
 {
-    var db = scope.ServiceProvider.GetRequiredService<TruvoID.Infrastructure.Data.TruvoIDDbContext>();
-    await db.Database.EnsureCreatedAsync();
-    await TruvoID.Infrastructure.Data.SeedData.SeedAsync(db);
+    var mongoDbContext = app.Services.GetRequiredService<MongoDbContext>();
+
+    Console.WriteLine("[Startup] Ensuring MongoDB indexes...");
+    await mongoDbContext.EnsureIndexesAsync();
+    Console.WriteLine("[Startup] MongoDB indexes ready.");
+
+    var hasAdmin = await mongoDbContext.Users.CountDocumentsAsync(u => u.Role == UserRole.PlatformAdmin) > 0;
+    if (!hasAdmin)
+    {
+        Console.WriteLine("[Startup] Seeding PlatformAdmin user...");
+        await mongoDbContext.Users.InsertOneAsync(new User
+        {
+            Email = "admin@truvoid.ng",
+            FullName = "TruvoID Platform Admin",
+            PhoneNumber = "+2348000000000",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@12345"),
+            Role = UserRole.PlatformAdmin,
+            Status = UserStatus.Active
+        });
+        Console.WriteLine("[Seed] PlatformAdmin created: admin@truvoid.ng / Admin@12345");
+    }
+
+    var hasPricing = await mongoDbContext.PricingRates.CountDocumentsAsync(_ => true) > 0;
+    if (!hasPricing)
+    {
+        Console.WriteLine("[Startup] Seeding default pricing rates...");
+        await mongoDbContext.PricingRates.InsertManyAsync(new List<PricingRate>
+        {
+            new() { Type = VerificationType.Nin, PricePerCall = 100m, NimcPartnerCost = 45m, IsActive = true, EffectiveFrom = DateTime.UtcNow },
+            new() { Type = VerificationType.Bvn, PricePerCall = 150m, NimcPartnerCost = 65m, IsActive = true, EffectiveFrom = DateTime.UtcNow },
+            new() { Type = VerificationType.Phone, PricePerCall = 50m, NimcPartnerCost = 20m, IsActive = true, EffectiveFrom = DateTime.UtcNow }
+        });
+        Console.WriteLine("[Seed] Default pricing rates created.");
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[Startup] Database setup failed: {ex.Message}");
 }
 
 // Configure the HTTP request pipeline.
@@ -81,27 +123,17 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
+app.UseStaticFiles();
+app.UseAntiforgery();
 app.UseCors();
-
-// API key authentication for /v1 API endpoints
-app.UseWhen(
-    context => context.Request.Path.StartsWithSegments("/v1"),
-    appBuilder => appBuilder.UseMiddleware<ApiKeyAuthenticationMiddleware>());
-
-// Routing must come before Authorization
-app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Map API controllers
 app.MapControllers();
-
-// Blazor Razor components for the dashboard
-app.UseAntiforgery();
-app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+Console.WriteLine($"[Startup] TruvoID listening on port {port}");
 
 app.Run();

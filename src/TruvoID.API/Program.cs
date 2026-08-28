@@ -1,9 +1,11 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using MongoDB.Driver;
 using TruvoID.API.Extensions;
 using TruvoID.API.Middleware;
+using TruvoID.Domain.Entities;
+using TruvoID.Domain.Enums;
 using TruvoID.Infrastructure.Data;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -46,8 +48,6 @@ builder.Services.AddAuthentication(options =>
 });
 
 builder.Services.AddAuthorization();
-
-// CORS
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
@@ -57,7 +57,6 @@ builder.Services.AddCors(options =>
               .AllowAnyHeader();
     });
 });
-
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
@@ -92,42 +91,49 @@ app.UseWhen(
 
 app.MapControllers();
 
-// ─── Ensure database schema exists on startup ───
+// ─── MongoDB: Create indexes + seed data on startup ───
 try
 {
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<TruvoIDDbContext>();
-    var conn = db.Database.GetDbConnection();
-    await conn.OpenAsync();
+    var mongoDbContext = app.Services.GetRequiredService<MongoDbContext>();
 
-    // Check if the users table exists
-    using (var checkCmd = conn.CreateCommand())
+    Console.WriteLine("[Startup] Ensuring MongoDB indexes...");
+    await mongoDbContext.EnsureIndexesAsync();
+    Console.WriteLine("[Startup] MongoDB indexes ready.");
+
+    // Seed PlatformAdmin user
+    var hasAdmin = await mongoDbContext.Users.CountDocumentsAsync(u => u.Role == UserRole.PlatformAdmin) > 0;
+    if (!hasAdmin)
     {
-        checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users'";
-        var count = Convert.ToInt64(await checkCmd.ExecuteScalarAsync() ?? 0);
-
-        if (count == 0)
+        Console.WriteLine("[Startup] Seeding PlatformAdmin user...");
+        var adminUser = new User
         {
-            Console.WriteLine("[Startup] Users table not found. Dropping __EFMigrationsHistory and creating schema...");
-
-            // Drop the stale migration history so EnsureCreated works
-            using (var dropCmd = conn.CreateCommand())
-            {
-                dropCmd.CommandText = "DROP TABLE IF EXISTS \"__EFMigrationsHistory\" CASCADE";
-                await dropCmd.ExecuteNonQueryAsync();
-            }
-
-            // Create all tables from the DbContext model
-            await db.Database.EnsureCreatedAsync();
-            Console.WriteLine("[Startup] Schema created via EnsureCreated.");
-        }
-        else
-        {
-            Console.WriteLine("[Startup] Database schema already exists — skipping.");
-        }
+            Email = "admin@truvoid.ng",
+            FullName = "TruvoID Platform Admin",
+            PhoneNumber = "+2348000000000",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@12345"),
+            Role = UserRole.PlatformAdmin,
+            Status = UserStatus.Active,
+            DailyCallLimit = null
+        };
+        await mongoDbContext.Users.InsertOneAsync(adminUser);
+        Console.WriteLine("[Seed] PlatformAdmin created: admin@truvoid.ng / Admin@12345");
     }
 
-    await SeedData.SeedAsync(db);
+    // Seed default pricing rates
+    var hasPricing = await mongoDbContext.PricingRates.CountDocumentsAsync(_ => true) > 0;
+    if (!hasPricing)
+    {
+        Console.WriteLine("[Startup] Seeding default pricing rates...");
+        var defaultRates = new List<PricingRate>
+        {
+            new() { Type = VerificationType.Nin, PricePerCall = 100.00m, NimcPartnerCost = 45.00m, IsActive = true, EffectiveFrom = DateTime.UtcNow },
+            new() { Type = VerificationType.Bvn, PricePerCall = 150.00m, NimcPartnerCost = 65.00m, IsActive = true, EffectiveFrom = DateTime.UtcNow },
+            new() { Type = VerificationType.Phone, PricePerCall = 50.00m, NimcPartnerCost = 20.00m, IsActive = true, EffectiveFrom = DateTime.UtcNow }
+        };
+        await mongoDbContext.PricingRates.InsertManyAsync(defaultRates);
+        Console.WriteLine("[Seed] Default pricing rates created.");
+    }
+
     Console.WriteLine("[Startup] Database seeded successfully.");
 }
 catch (Exception ex)

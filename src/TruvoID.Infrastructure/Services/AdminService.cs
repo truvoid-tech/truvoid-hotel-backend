@@ -1,4 +1,6 @@
-using Microsoft.EntityFrameworkCore;
+using TruvoID.Domain.Entities;
+using TruvoID.Domain.Enums;
+using MongoDB.Driver;
 using TruvoID.Core.DTOs;
 using TruvoID.Core.Interfaces;
 using TruvoID.Domain.Enums;
@@ -8,14 +10,9 @@ namespace TruvoID.Infrastructure.Services;
 
 public class AdminService : IAdminService
 {
-    private readonly TruvoIDDbContext _db;
+    private readonly MongoDbContext _db;
 
-    public AdminService(TruvoIDDbContext db)
-    {
-        _db = db;
-    }
-
-    // ──────────────────────────── Overview ────────────────────────────
+    public AdminService(MongoDbContext db) => _db = db;
 
     public async Task<AdminOverviewDto> GetOverviewAsync(CancellationToken ct = default)
     {
@@ -23,40 +20,28 @@ public class AdminService : IAdminService
         var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         var lastMonthStart = monthStart.AddMonths(-1);
 
-        // Institution counts
-        var allInstitutions = await _db.Institutions
-            .Select(i => new { i.Id, i.Status, i.CreatedAt, i.ContactEmail, i.Name })
-            .ToListAsync(ct);
-
+        var allInstitutions = await _db.Institutions.Find(_ => true).ToListAsync(ct);
         var activeCount = allInstitutions.Count(i => i.Status == InstitutionStatus.Active);
         var pendingCount = allInstitutions.Count(i => i.Status == InstitutionStatus.PendingActivation);
         var newThisMonth = allInstitutions.Count(i => i.CreatedAt >= monthStart);
 
-        // Verification calls MTD
         var callsThisMonth = await _db.VerificationCalls
-            .Where(v => v.CreatedAt >= monthStart)
-            .ToListAsync(ct);
+            .Find(v => v.CreatedAt >= monthStart).ToListAsync(ct);
 
         var callsLastMonth = await _db.VerificationCalls
-            .Where(v => v.CreatedAt >= lastMonthStart && v.CreatedAt < monthStart)
-            .ToListAsync(ct);
+            .Find(v => v.CreatedAt >= lastMonthStart && v.CreatedAt < monthStart).ToListAsync(ct);
 
-        // Revenue & costs MTD — from wallet debits
         var debitsThisMonth = await _db.WalletLedgerEntries
-            .Where(w => w.Type == WalletTransactionType.Debit && w.CreatedAt >= monthStart)
-            .ToListAsync(ct);
+            .Find(w => w.Type == WalletTransactionType.Debit && w.CreatedAt >= monthStart).ToListAsync(ct);
 
         var debitsLastMonth = await _db.WalletLedgerEntries
-            .Where(w => w.Type == WalletTransactionType.Debit && w.CreatedAt >= lastMonthStart && w.CreatedAt < monthStart)
-            .ToListAsync(ct);
+            .Find(w => w.Type == WalletTransactionType.Debit && w.CreatedAt >= lastMonthStart && w.CreatedAt < monthStart).ToListAsync(ct);
 
         var revenueMtd = debitsThisMonth.Sum(d => Math.Abs(d.Amount));
         var revenueLastMonth = debitsLastMonth.Sum(d => Math.Abs(d.Amount));
 
-        // Get global NIMC cost per type
         var globalPricing = await _db.PricingRates
-            .Where(r => r.InstitutionId == null && r.IsActive)
-            .ToListAsync(ct);
+            .Find(r => r.InstitutionId == null && r.IsActive).ToListAsync(ct);
 
         var callsByType = callsThisMonth.GroupBy(c => c.Type).ToDictionary(g => g.Key, g => g.Count());
         var totalNimcCost = 0m;
@@ -66,18 +51,25 @@ public class AdminService : IAdminService
             totalNimcCost += (rate?.NimcPartnerCost ?? 0) * kvp.Value;
         }
 
-        // Wallet balances
-        var totalWalletBalances = await _db.WalletLedgerEntries
-            .GroupBy(w => w.InstitutionId)
-            .Select(g => g.OrderByDescending(w => w.CreatedAt).First().BalanceAfter)
-            .SumAsync(ct);
+        // Total wallet balances — get latest entry per institution
+        var totalWalletBalances = 0m;
+        var instIds = allInstitutions.Select(i => i.Id).ToList();
+        foreach (var instId in instIds)
+        {
+            var lastEntry = await _db.WalletLedgerEntries
+                .Find(w => w.InstitutionId == instId)
+                .SortByDescending(w => w.CreatedAt)
+                .FirstOrDefaultAsync(ct);
+            if (lastEntry is not null)
+                totalWalletBalances += lastEntry.BalanceAfter;
+        }
 
-        // Pending top-ups (credits with description containing "topup")
-        var pendingTopUps = await _db.WalletLedgerEntries
-            .Where(w => w.Type == WalletTransactionType.Credit && w.Description != null && w.Description.Contains("pending"))
-            .CountAsync(ct);
+        var pendingTopUps = (int)await _db.WalletLedgerEntries
+            .CountDocumentsAsync(Builders<WalletLedgerEntry>.Filter.And(
+                Builders<WalletLedgerEntry>.Filter.Eq(w => w.Type, WalletTransactionType.Credit),
+                Builders<WalletLedgerEntry>.Filter.Ne(w => w.Description, null),
+                Builders<WalletLedgerEntry>.Filter.Regex(w => w.Description, new MongoDB.Bson.BsonRegularExpression("pending", "i"))), null, ct);
 
-        // Revenue growth
         var growthPct = revenueLastMonth > 0
             ? Math.Round((revenueMtd - revenueLastMonth) / revenueLastMonth * 100, 1)
             : 0m;
@@ -90,19 +82,13 @@ public class AdminService : IAdminService
             .ToList();
 
         var topInstIds = topInstData.Select(g => g.Key).ToList();
-        var topInstDetails = await _db.Institutions
-            .Where(i => topInstIds.Contains(i.Id))
-            .ToDictionaryAsync(i => i.Id, ct);
-
-        var topInstitutions = topInstData.Select(g =>
+        var topInstitutions = new List<InstitutionVolumeDto>();
+        foreach (var g in topInstData)
         {
-            var inst = topInstDetails.GetValueOrDefault(g.Key);
+            var inst = allInstitutions.FirstOrDefault(i => i.Id == g.Key);
             var callCount = g.Count();
-            var revForInst = debitsThisMonth
-                .Where(d => d.InstitutionId == g.Key)
-                .Sum(d => Math.Abs(d.Amount));
-
-            return new InstitutionVolumeDto
+            var revForInst = debitsThisMonth.Where(d => d.InstitutionId == g.Key).Sum(d => Math.Abs(d.Amount));
+            topInstitutions.Add(new InstitutionVolumeDto
             {
                 Id = g.Key,
                 Name = inst?.Name ?? "Unknown",
@@ -110,13 +96,8 @@ public class AdminService : IAdminService
                 CallsMtd = callCount,
                 RevenueMtd = revForInst,
                 Active = inst?.Status == InstitutionStatus.Active
-            };
-        }).ToList();
-
-        // Call breakdown
-        var ninCount = callsThisMonth.Count(c => c.Type == VerificationType.Nin);
-        var bvnCount = callsThisMonth.Count(c => c.Type == VerificationType.Bvn);
-        var phoneCount = callsThisMonth.Count(c => c.Type == VerificationType.Phone);
+            });
+        }
 
         return new AdminOverviewDto
         {
@@ -133,125 +114,112 @@ public class AdminService : IAdminService
             TopInstitutions = topInstitutions,
             CallBreakdown = new CallBreakdownDto
             {
-                NinCalls = ninCount,
-                BvnCalls = bvnCount,
-                PhoneCalls = phoneCount
+                NinCalls = callsThisMonth.Count(c => c.Type == VerificationType.Nin),
+                BvnCalls = callsThisMonth.Count(c => c.Type == VerificationType.Bvn),
+                PhoneCalls = callsThisMonth.Count(c => c.Type == VerificationType.Phone)
             }
         };
     }
 
-    // ──────────────────────────── Institutions ────────────────────────────
-
-    public async Task<List<AdminInstitutionDto>> GetInstitutionsAsync(
-        string? search = null, string? status = null, CancellationToken ct = default)
+    public async Task<List<AdminInstitutionDto>> GetInstitutionsAsync(string? search = null, string? status = null, CancellationToken ct = default)
     {
-        var query = _db.Institutions
-            .Include(i => i.Users)
-            .AsQueryable();
+        var filterBuilder = Builders<Domain.Entities.Institution>.Filter;
+        var filter = filterBuilder.Empty;
 
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.ToLower();
-            query = query.Where(i =>
-                i.Name.ToLower().Contains(term) ||
-                (i.ContactEmail != null && i.ContactEmail.ToLower().Contains(term)));
+            filter = filterBuilder.And(filter,
+                filterBuilder.Or(
+                    filterBuilder.Regex(i => i.Name, new MongoDB.Bson.BsonRegularExpression(term, "i")),
+                    filterBuilder.Regex(i => i.ContactEmail, new MongoDB.Bson.BsonRegularExpression(term, "i"))));
         }
 
-        if (!string.IsNullOrWhiteSpace(status))
-        {
-            if (Enum.TryParse<InstitutionStatus>(status, true, out var statusEnum))
-                query = query.Where(i => i.Status == statusEnum);
-        }
+        if (!string.IsNullOrWhiteSpace(status) && Enum.TryParse<InstitutionStatus>(status, true, out var statusEnum))
+            filter = filterBuilder.And(filter, filterBuilder.Eq(i => i.Status, statusEnum));
 
-        var institutions = await query
-            .OrderByDescending(i => i.CreatedAt)
+        var institutions = await _db.Institutions.Find(filter)
+            .SortByDescending(i => i.CreatedAt)
             .ToListAsync(ct);
 
-        // Get call counts and wallet balances in bulk
         var instIds = institutions.Select(i => i.Id).ToList();
+        var monthStart = GetMonthStart();
 
-        var callCounts = await _db.VerificationCalls
-            .Where(v => instIds.Contains(v.InstitutionId) && v.CreatedAt >= GetMonthStart())
-            .GroupBy(v => v.InstitutionId)
-            .Select(g => new { InstitutionId = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(g => g.InstitutionId, g => g.Count, ct);
-
-        var latestBalances = await _db.WalletLedgerEntries
-            .Where(w => instIds.Contains(w.InstitutionId))
-            .GroupBy(w => w.InstitutionId)
-            .Select(g => new { InstitutionId = g.Key, Balance = g.OrderByDescending(x => x.CreatedAt).First().BalanceAfter })
-            .ToDictionaryAsync(g => g.InstitutionId, g => g.Balance, ct);
-
-        return institutions.Select(i => new AdminInstitutionDto
+        // Get call counts and balances per institution
+        var results = new List<AdminInstitutionDto>();
+        foreach (var inst in institutions)
         {
-            Id = i.Id,
-            Name = i.Name,
-            Email = i.ContactEmail ?? "",
-            Status = MapInstitutionStatus(i.Status),
-            WalletBalance = latestBalances.GetValueOrDefault(i.Id, 0),
-            ApiCallsMtd = callCounts.GetValueOrDefault(i.Id, 0),
-            JoinedDate = i.CreatedAt,
-            Type = i.Type.ToString()
-        }).ToList();
+            var callCount = (int)await _db.VerificationCalls.CountDocumentsAsync(
+                Builders<Domain.Entities.VerificationCall>.Filter.And(Builders<Domain.Entities.VerificationCall>.Filter.Eq(v => v.InstitutionId, inst.Id), Builders<Domain.Entities.VerificationCall>.Filter.Gte(v => v.CreatedAt, monthStart)), null, ct);
+
+            var lastEntry = await _db.WalletLedgerEntries
+                .Find(w => w.InstitutionId == inst.Id)
+                .SortByDescending(w => w.CreatedAt)
+                .FirstOrDefaultAsync(ct);
+
+            results.Add(new AdminInstitutionDto
+            {
+                Id = inst.Id,
+                Name = inst.Name,
+                Email = inst.ContactEmail ?? "",
+                Status = MapInstitutionStatus(inst.Status),
+                WalletBalance = lastEntry?.BalanceAfter ?? 0,
+                ApiCallsMtd = callCount,
+                JoinedDate = inst.CreatedAt,
+                Type = inst.Type.ToString()
+            });
+        }
+
+        return results;
     }
 
     public async Task SuspendInstitutionAsync(Guid institutionId, CancellationToken ct = default)
     {
-        var institution = await _db.Institutions.FindAsync(new object[] { institutionId }, ct)
-            ?? throw new KeyNotFoundException("Institution not found.");
-
-        institution.Status = InstitutionStatus.Suspended;
-        institution.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(ct);
+        var update = Builders<Domain.Entities.Institution>.Update
+            .Set(i => i.Status, InstitutionStatus.Suspended)
+            .Set(i => i.UpdatedAt, DateTime.UtcNow);
+        var result = await _db.Institutions.UpdateOneAsync(i => i.Id == institutionId, update, cancellationToken: ct);
+        if (result.MatchedCount == 0) throw new KeyNotFoundException("Institution not found.");
     }
 
     public async Task ReactivateInstitutionAsync(Guid institutionId, CancellationToken ct = default)
     {
-        var institution = await _db.Institutions.FindAsync(new object[] { institutionId }, ct)
-            ?? throw new KeyNotFoundException("Institution not found.");
-
-        institution.Status = InstitutionStatus.Active;
-        institution.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(ct);
+        var update = Builders<Domain.Entities.Institution>.Update
+            .Set(i => i.Status, InstitutionStatus.Active)
+            .Set(i => i.UpdatedAt, DateTime.UtcNow);
+        var result = await _db.Institutions.UpdateOneAsync(i => i.Id == institutionId, update, cancellationToken: ct);
+        if (result.MatchedCount == 0) throw new KeyNotFoundException("Institution not found.");
     }
 
     public async Task ApproveInstitutionAsync(Guid institutionId, CancellationToken ct = default)
     {
-        var institution = await _db.Institutions.FindAsync(new object[] { institutionId }, ct)
-            ?? throw new KeyNotFoundException("Institution not found.");
-
-        institution.Status = InstitutionStatus.Active;
-        institution.OnboardingCompleted = true;
-        institution.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(ct);
+        var update = Builders<Domain.Entities.Institution>.Update
+            .Set(i => i.Status, InstitutionStatus.Active)
+            .Set(i => i.OnboardingCompleted, true)
+            .Set(i => i.UpdatedAt, DateTime.UtcNow);
+        var result = await _db.Institutions.UpdateOneAsync(i => i.Id == institutionId, update, cancellationToken: ct);
+        if (result.MatchedCount == 0) throw new KeyNotFoundException("Institution not found.");
     }
-
-    // ──────────────────────────── Financials ────────────────────────────
 
     public async Task<AdminFinancialsDto> GetFinancialsAsync(string period = "mtd", CancellationToken ct = default)
     {
         var monthStart = GetPeriodStart(period);
 
-        // All wallet ledger entries for the period
         var entries = await _db.WalletLedgerEntries
-            .Include(w => w.Institution)
-            .Where(w => w.CreatedAt >= monthStart)
-            .OrderByDescending(w => w.CreatedAt)
+            .Find(w => w.CreatedAt >= monthStart)
+            .SortByDescending(w => w.CreatedAt)
+            .Limit(100)
             .ToListAsync(ct);
 
         var credits = entries.Where(w => w.Type == WalletTransactionType.Credit).ToList();
         var debits = entries.Where(w => w.Type == WalletTransactionType.Debit).ToList();
-
         var grossRevenue = debits.Sum(d => Math.Abs(d.Amount));
 
-        // NIMC costs — sum of NimcPartnerCost * calls
         var callsInPeriod = await _db.VerificationCalls
-            .Where(v => v.CreatedAt >= monthStart)
-            .ToListAsync(ct);
+            .Find(v => v.CreatedAt >= monthStart).ToListAsync(ct);
 
         var globalPricing = await _db.PricingRates
-            .Where(r => r.InstitutionId == null && r.IsActive)
-            .ToListAsync(ct);
+            .Find(r => r.InstitutionId == null && r.IsActive).ToListAsync(ct);
 
         var nimcPayouts = 0m;
         foreach (var call in callsInPeriod)
@@ -260,34 +228,33 @@ public class AdminService : IAdminService
             nimcPayouts += rate?.NimcPartnerCost ?? 0;
         }
 
-        // Pending top-ups — credits still awaiting confirmation
+        // Get institution names for entries
+        var instIds = entries.Select(w => w.InstitutionId).Distinct().ToList();
+        var institutions = await _db.Institutions.Find(i => instIds.Contains(i.Id)).ToListAsync(ct);
+        var instDict = institutions.ToDictionary(i => i.Id, i => i);
+
         var pendingTopUps = credits
             .Where(w => w.Description != null && w.Description.Contains("pending"))
             .Select(w => new AdminTopUpDto
             {
                 Id = w.Id,
-                Institution = w.Institution?.Name ?? "Unknown",
-                Email = w.Institution?.ContactEmail ?? "",
+                Institution = instDict.GetValueOrDefault(w.InstitutionId)?.Name ?? "Unknown",
+                Email = instDict.GetValueOrDefault(w.InstitutionId)?.ContactEmail ?? "",
                 Amount = w.Amount,
                 Reference = w.ReferenceId ?? "",
                 Submitted = w.CreatedAt.ToString("dd MMM yyyy, HH:mm")
-            })
-            .ToList();
+            }).ToList();
 
-        // Transaction log
         var transactions = entries
             .Take(50)
             .Select(w => new AdminTransactionDto
             {
                 Reference = w.ReferenceId ?? w.Id.ToString()[..8],
-                Institution = w.Institution?.Name ?? "Unknown",
+                Institution = instDict.GetValueOrDefault(w.InstitutionId)?.Name ?? "Unknown",
                 Type = w.Type == WalletTransactionType.Credit ? "Wallet Top-Up" : "API Call",
                 Amount = w.Type == WalletTransactionType.Credit ? w.Amount : -w.Amount,
                 Date = w.CreatedAt.ToString("dd MMM yyyy, HH:mm")
-            })
-            .ToList();
-
-        var totalCalls = callsInPeriod.Count;
+            }).ToList();
 
         return new AdminFinancialsDto
         {
@@ -295,50 +262,43 @@ public class AdminService : IAdminService
             NimcPayouts = nimcPayouts,
             NetProfit = grossRevenue - nimcPayouts,
             MarginPct = grossRevenue > 0 ? Math.Round((grossRevenue - nimcPayouts) / grossRevenue * 100, 1) : 0,
-            TotalCalls = totalCalls,
+            TotalCalls = callsInPeriod.Count,
             PendingTopUps = pendingTopUps,
             Transactions = transactions
         };
     }
 
-    // ──────────────────────────── Top-ups ────────────────────────────
-
     public async Task ApproveTopUpAsync(Guid topupId, CancellationToken ct = default)
     {
-        var entry = await _db.WalletLedgerEntries.FindAsync(new object[] { topupId }, ct)
+        var entry = await _db.WalletLedgerEntries.Find(e => e.Id == topupId).FirstOrDefaultAsync(ct)
             ?? throw new KeyNotFoundException("Top-up entry not found.");
 
         if (entry.Type != WalletTransactionType.Credit)
             throw new InvalidOperationException("Entry is not a credit/top-up.");
 
-        // Remove "pending" marker to approve
-        entry.Description = entry.Description?.Replace("pending", "approved") ?? "approved";
-        entry.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(ct);
+        var update = Builders<WalletLedgerEntry>.Update
+            .Set(e => e.Description, entry.Description?.Replace("pending", "approved") ?? "approved")
+            .Set(e => e.UpdatedAt, DateTime.UtcNow);
+        await _db.WalletLedgerEntries.UpdateOneAsync(e => e.Id == topupId, update, cancellationToken: ct);
     }
 
     public async Task RejectTopUpAsync(Guid topupId, CancellationToken ct = default)
     {
-        var entry = await _db.WalletLedgerEntries.FindAsync(new object[] { topupId }, ct)
+        var entry = await _db.WalletLedgerEntries.Find(e => e.Id == topupId).FirstOrDefaultAsync(ct)
             ?? throw new KeyNotFoundException("Top-up entry not found.");
 
         if (entry.Type != WalletTransactionType.Credit)
             throw new InvalidOperationException("Entry is not a credit/top-up.");
 
-        // Remove rejected entry
-        _db.WalletLedgerEntries.Remove(entry);
-        await _db.SaveChangesAsync(ct);
+        await _db.WalletLedgerEntries.DeleteOneAsync(e => e.Id == topupId, cancellationToken: ct);
     }
-
-    // ──────────────────────────── Pricing ────────────────────────────
 
     public async Task<List<AdminPricingDto>> GetPricingAsync(CancellationToken ct = default)
     {
         var globalRates = await _db.PricingRates
-            .Where(r => r.InstitutionId == null && r.IsActive)
+            .Find(r => r.InstitutionId == null && r.IsActive)
             .ToListAsync(ct);
 
-        // Map VerificationType to display names
         return globalRates.Select(r => new AdminPricingDto
         {
             Type = r.Type switch
@@ -364,16 +324,13 @@ public class AdminService : IAdminService
         };
 
         // Deactivate old global rate
-        var existingRates = await _db.PricingRates
-            .Where(r => r.Type == verificationType && r.InstitutionId == null && r.IsActive)
-            .ToListAsync(ct);
-
-        foreach (var rate in existingRates)
-        {
-            rate.IsActive = false;
-            rate.EffectiveTo = DateTime.UtcNow;
-            rate.UpdatedAt = DateTime.UtcNow;
-        }
+        var deactivateUpdate = Builders<PricingRate>.Update
+            .Set(r => r.IsActive, false)
+            .Set(r => r.EffectiveTo, DateTime.UtcNow)
+            .Set(r => r.UpdatedAt, DateTime.UtcNow);
+        await _db.PricingRates.UpdateManyAsync(
+            r => r.Type == verificationType && r.InstitutionId == null && r.IsActive,
+            deactivateUpdate, cancellationToken: ct);
 
         // Insert new rate
         var newRate = new TruvoID.Domain.Entities.PricingRate
@@ -384,12 +341,8 @@ public class AdminService : IAdminService
             IsActive = true,
             EffectiveFrom = DateTime.UtcNow
         };
-
-        _db.PricingRates.Add(newRate);
-        await _db.SaveChangesAsync(ct);
+        await _db.PricingRates.InsertOneAsync(newRate, cancellationToken: ct);
     }
-
-    // ──────────────────────────── Helpers ────────────────────────────
 
     private static DateTime GetMonthStart()
     {
@@ -402,7 +355,7 @@ public class AdminService : IAdminService
         "last" => GetMonthStart().AddMonths(-1),
         "q" => GetMonthStart().AddMonths(-(GetMonthStart().Month - 1) % 3),
         "ytd" => new DateTime(GetMonthStart().Year, 1, 1, 0, 0, 0, DateTimeKind.Utc),
-        _ => GetMonthStart() // mtd
+        _ => GetMonthStart()
     };
 
     private static string MapInstitutionStatus(InstitutionStatus status) => status switch

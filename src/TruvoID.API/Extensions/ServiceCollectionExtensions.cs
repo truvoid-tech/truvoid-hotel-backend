@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+using MongoDB.Driver;
 using StackExchange.Redis;
 using TruvoID.Core.Interfaces;
 using TruvoID.Infrastructure.Data;
@@ -8,26 +8,21 @@ namespace TruvoID.API.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-    /// <summary>
-    /// Registers all application services (DbContext, Redis, business services).
-    /// </summary>
     public static IServiceCollection AddTruvoIDServices(this IServiceCollection services, IConfiguration configuration)
     {
-        // PostgreSQL — auto-append Ssl Mode=Require for Neon if not already present
-        var connectionString = configuration.GetConnectionString("DefaultConnection") ?? "";
-        if (!connectionString.Contains("Ssl Mode", StringComparison.OrdinalIgnoreCase)
-            && !connectionString.Contains("SslMode", StringComparison.OrdinalIgnoreCase))
-        {
-            connectionString += ";Ssl Mode=Require";
-            Console.WriteLine("[Startup] Auto-appended Ssl Mode=Require to connection string for Neon compatibility.");
-        }
+        // MongoDB
+        var mongoConnectionString = configuration.GetConnectionString("MongoDb")
+            ?? Environment.GetEnvironmentVariable("MONGO_URI")
+            ?? "mongodb://localhost:27017";
+        var mongoDatabaseName = configuration["MongoDatabase"] ?? "truvoid";
 
-        Console.WriteLine($"[Startup] Connecting to database: {ExtractHost(connectionString)}");
+        Console.WriteLine($"[Startup] Connecting to MongoDB: {mongoConnectionString.Split('@').LastOrDefault() ?? mongoConnectionString}");
 
-        services.AddDbContext<TruvoIDDbContext>(options =>
-            options.UseNpgsql(connectionString));
+        var mongoClient = new MongoClient(mongoConnectionString);
+        services.AddSingleton<IMongoClient>(mongoClient);
+        services.AddSingleton(sp => new MongoDbContext(mongoClient, mongoDatabaseName));
 
-        // Redis — only connect if a real (non-localhost) URL is provided
+        // Redis — only if configured
         var redisConnection = configuration.GetConnectionString("Redis");
         var isRedisConfigured = !string.IsNullOrWhiteSpace(redisConnection)
                                 && !redisConnection.Contains("localhost", StringComparison.OrdinalIgnoreCase);
@@ -62,16 +57,5 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAdminService, AdminService>();
 
         return services;
-    }
-
-    private static string ExtractHost(string connectionString)
-    {
-        foreach (var part in connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries))
-        {
-            var trimmed = part.Trim();
-            if (trimmed.StartsWith("Host=", StringComparison.OrdinalIgnoreCase))
-                return trimmed;
-        }
-        return "(host not found in connection string)";
     }
 }

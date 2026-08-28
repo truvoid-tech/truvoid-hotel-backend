@@ -2,9 +2,9 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using MongoDB.Driver;
 using TruvoID.Core.DTOs;
 using TruvoID.Core.Interfaces;
 using TruvoID.Domain.Entities;
@@ -15,10 +15,10 @@ namespace TruvoID.Infrastructure.Services;
 
 public class AuthService : IAuthService
 {
-    private readonly TruvoIDDbContext _db;
+    private readonly MongoDbContext _db;
     private readonly IConfiguration _configuration;
 
-    public AuthService(TruvoIDDbContext db, IConfiguration configuration)
+    public AuthService(MongoDbContext db, IConfiguration configuration)
     {
         _db = db;
         _configuration = configuration;
@@ -26,20 +26,18 @@ public class AuthService : IAuthService
 
     public async Task<RegisterResponse> RegisterAsync(RegisterRequest request, CancellationToken ct = default)
     {
-        if (await _db.Users.AnyAsync(u => u.Email == request.AdminEmail, ct))
+        if (await _db.Users.CountDocumentsAsync(u => u.Email == request.AdminEmail, cancellationToken: ct) > 0)
             throw new InvalidOperationException("An account with this email already exists.");
 
         var institution = new Institution
         {
-            Id = Guid.NewGuid(),
             Name = request.InstitutionName,
             ContactEmail = request.ContactEmail,
             ContactPhone = request.ContactPhone,
-            Type = InstitutionType.Other,
             Status = InstitutionStatus.PendingActivation,
-            CreatedAt = DateTime.UtcNow
+            OnboardingStep = 1
         };
-        _db.Institutions.Add(institution);
+        await _db.Institutions.InsertOneAsync(institution, cancellationToken: ct);
 
         var adminUser = new User
         {
@@ -52,9 +50,7 @@ public class AuthService : IAuthService
             Status = UserStatus.Active,
             DailyCallLimit = null
         };
-
-        _db.Users.Add(adminUser);
-        await _db.SaveChangesAsync(ct);
+        await _db.Users.InsertOneAsync(adminUser, cancellationToken: ct);
 
         var (accessToken, expiresAt) = GenerateAccessToken(adminUser, institution);
         var refreshToken = await GenerateRefreshTokenAsync(adminUser.Id, ct);
@@ -71,9 +67,7 @@ public class AuthService : IAuthService
 
     public async Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken ct = default)
     {
-        var user = await _db.Users
-            .Include(u => u.Institution)
-            .FirstOrDefaultAsync(u => u.Email == request.Email, ct);
+        var user = await _db.Users.Find(u => u.Email == request.Email).FirstOrDefaultAsync(ct);
 
         if (user is null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
             throw new UnauthorizedAccessException("Invalid email or password.");
@@ -81,13 +75,20 @@ public class AuthService : IAuthService
         if (user.Status != UserStatus.Active)
             throw new UnauthorizedAccessException("Account is not active. Please contact your administrator.");
 
-        if (user.InstitutionId.HasValue && user.Institution?.Status == InstitutionStatus.Suspended)
-            throw new UnauthorizedAccessException("Institution account is suspended.");
+        // Only check institution suspension for non-platform-admin users
+        Institution? institution = null;
+        if (user.InstitutionId.HasValue)
+        {
+            institution = await _db.Institutions.Find(i => i.Id == user.InstitutionId.Value).FirstOrDefaultAsync(ct);
+            if (institution?.Status == InstitutionStatus.Suspended)
+                throw new UnauthorizedAccessException("Institution account is suspended.");
+        }
 
-        user.LastLoginAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(ct);
+        // Update last login
+        var update = Builders<User>.Update.Set(u => u.LastLoginAt, DateTime.UtcNow);
+        await _db.Users.UpdateOneAsync(u => u.Id == user.Id, update, cancellationToken: ct);
 
-        var institutionForToken = user.Institution ?? new Institution
+        var institutionForToken = institution ?? new Institution
         {
             Id = Guid.Empty,
             Name = "TruvoID Platform",
@@ -112,7 +113,7 @@ public class AuthService : IAuthService
                 Email = user.Email,
                 FullName = user.FullName,
                 Role = user.Role,
-                InstitutionName = user.Institution?.Name ?? "TruvoID Platform"
+                InstitutionName = institution?.Name ?? "TruvoID Platform"
             }
         };
     }
@@ -120,7 +121,8 @@ public class AuthService : IAuthService
     public async Task<TokenResponse> RefreshTokenAsync(string refreshToken, CancellationToken ct = default)
     {
         var tokenRecord = await _db.RefreshTokens
-            .FirstOrDefaultAsync(t => t.Token == refreshToken && !t.IsRevoked, ct);
+            .Find(t => t.Token == refreshToken && !t.IsRevoked)
+            .FirstOrDefaultAsync(ct);
 
         if (tokenRecord is null)
             throw new UnauthorizedAccessException("Invalid or expired refresh token.");
@@ -128,18 +130,21 @@ public class AuthService : IAuthService
         if (tokenRecord.ExpiresAt < DateTime.UtcNow)
             throw new UnauthorizedAccessException("Refresh token has expired.");
 
-        tokenRecord.IsRevoked = true;
-        tokenRecord.RevokedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(ct);
+        // Revoke old token
+        var revokeUpdate = Builders<RefreshToken>.Update
+            .Set(t => t.IsRevoked, true)
+            .Set(t => t.RevokedAt, DateTime.UtcNow);
+        await _db.RefreshTokens.UpdateOneAsync(t => t.Id == tokenRecord.Id, revokeUpdate, cancellationToken: ct);
 
-        var user = await _db.Users
-            .Include(u => u.Institution)
-            .FirstOrDefaultAsync(u => u.Id == tokenRecord.UserId, ct);
-
+        var user = await _db.Users.Find(u => u.Id == tokenRecord.UserId).FirstOrDefaultAsync(ct);
         if (user is null || user.Status != UserStatus.Active)
             throw new UnauthorizedAccessException("User account is not active.");
 
-        var institutionForToken = user.Institution ?? new Institution
+        Institution? institution = null;
+        if (user.InstitutionId.HasValue)
+            institution = await _db.Institutions.Find(i => i.Id == user.InstitutionId.Value).FirstOrDefaultAsync(ct);
+
+        var institutionForToken = institution ?? new Institution
         {
             Id = Guid.Empty,
             Name = "TruvoID Platform",
@@ -160,82 +165,78 @@ public class AuthService : IAuthService
 
     public async Task RevokeRefreshTokenAsync(string refreshToken, CancellationToken ct = default)
     {
-        var tokenRecord = await _db.RefreshTokens
-            .FirstOrDefaultAsync(t => t.Token == refreshToken, ct);
-
-        if (tokenRecord is not null)
-        {
-            tokenRecord.IsRevoked = true;
-            tokenRecord.RevokedAt = DateTime.UtcNow;
-            await _db.SaveChangesAsync(ct);
-        }
+        var update = Builders<RefreshToken>.Update
+            .Set(t => t.IsRevoked, true)
+            .Set(t => t.RevokedAt, DateTime.UtcNow);
+        await _db.RefreshTokens.UpdateOneAsync(t => t.Token == refreshToken, update, cancellationToken: ct);
     }
 
     public async Task ForgotPasswordAsync(string email, CancellationToken ct = default)
     {
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email, ct);
+        var user = await _db.Users.Find(u => u.Email == email).FirstOrDefaultAsync(ct);
         if (user is null) return;
 
-        var resetToken = GenerateSecureToken();
-        user.PasswordResetToken = resetToken;
-        user.PasswordResetTokenExpiry = DateTime.UtcNow.AddHours(1);
-        await _db.SaveChangesAsync(ct);
-
-        // TODO: Send email with reset token via Resend/SendGrid
+        var resetToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+        var update = Builders<User>.Update
+            .Set(u => u.PasswordResetToken, resetToken)
+            .Set(u => u.PasswordResetTokenExpiry, DateTime.UtcNow.AddHours(1));
+        await _db.Users.UpdateOneAsync(u => u.Id == user.Id, update, cancellationToken: ct);
     }
 
     public async Task ResetPasswordAsync(ResetPasswordRequest request, CancellationToken ct = default)
     {
-        var user = await _db.Users.FirstOrDefaultAsync(
-            u => u.PasswordResetToken == request.Token
-                 && u.PasswordResetTokenExpiry > DateTime.UtcNow, ct);
+        var user = await _db.Users.Find(u =>
+            u.PasswordResetToken == request.Token
+            && u.PasswordResetTokenExpiry > DateTime.UtcNow).FirstOrDefaultAsync(ct);
 
         if (user is null)
             throw new UnauthorizedAccessException("Invalid or expired reset token.");
 
-        ValidatePassword(request.NewPassword);
+        if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 8)
+            throw new ArgumentException("Password must be at least 8 characters long.");
 
-        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
-        user.PasswordResetToken = null;
-        user.PasswordResetTokenExpiry = null;
-        user.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(ct);
+        var update = Builders<User>.Update
+            .Set(u => u.PasswordHash, BCrypt.Net.BCrypt.HashPassword(request.NewPassword))
+            .Set(u => u.PasswordResetToken, (string?)null)
+            .Set(u => u.PasswordResetTokenExpiry, (DateTime?)null)
+            .Set(u => u.UpdatedAt, DateTime.UtcNow);
+        await _db.Users.UpdateOneAsync(u => u.Id == user.Id, update, cancellationToken: ct);
 
-        var tokens = await _db.RefreshTokens
-            .Where(t => t.UserId == user.Id && !t.IsRevoked)
-            .ToListAsync(ct);
-
-        foreach (var token in tokens)
-        {
-            token.IsRevoked = true;
-            token.RevokedAt = DateTime.UtcNow;
-        }
-
-        await _db.SaveChangesAsync(ct);
+        // Revoke all refresh tokens
+        var revokeUpdate = Builders<RefreshToken>.Update
+            .Set(t => t.IsRevoked, true)
+            .Set(t => t.RevokedAt, DateTime.UtcNow);
+        await _db.RefreshTokens.UpdateManyAsync(t => t.UserId == user.Id && !t.IsRevoked, revokeUpdate, cancellationToken: ct);
     }
 
     public async Task ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken ct = default)
     {
-        var user = await _db.Users.FindAsync(new object[] { userId }, ct)
+        var user = await _db.Users.Find(u => u.Id == userId).FirstOrDefaultAsync(ct)
             ?? throw new KeyNotFoundException("User not found.");
 
         if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
             throw new UnauthorizedAccessException("Current password is incorrect.");
 
-        ValidatePassword(request.NewPassword);
+        if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 8)
+            throw new ArgumentException("Password must be at least 8 characters long.");
 
-        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
-        user.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(ct);
+        var update = Builders<User>.Update
+            .Set(u => u.PasswordHash, BCrypt.Net.BCrypt.HashPassword(request.NewPassword))
+            .Set(u => u.UpdatedAt, DateTime.UtcNow);
+        await _db.Users.UpdateOneAsync(u => u.Id == userId, update, cancellationToken: ct);
     }
 
     public async Task<UserProfile?> GetUserProfileAsync(Guid userId, CancellationToken ct = default)
     {
-        var user = await _db.Users
-            .Include(u => u.Institution)
-            .FirstOrDefaultAsync(u => u.Id == userId, ct);
-
+        var user = await _db.Users.Find(u => u.Id == userId).FirstOrDefaultAsync(ct);
         if (user is null) return null;
+
+        string institutionName = "TruvoID Platform";
+        if (user.InstitutionId.HasValue)
+        {
+            var institution = await _db.Institutions.Find(i => i.Id == user.InstitutionId.Value).FirstOrDefaultAsync(ct);
+            institutionName = institution?.Name ?? "Unknown";
+        }
 
         return new UserProfile
         {
@@ -244,7 +245,7 @@ public class AuthService : IAuthService
             Email = user.Email,
             FullName = user.FullName,
             Role = user.Role,
-            InstitutionName = user.Institution?.Name ?? "TruvoID Platform"
+            InstitutionName = institutionName
         };
     }
 
@@ -284,42 +285,25 @@ public class AuthService : IAuthService
     {
         var token = new RefreshToken
         {
-            Id = Guid.NewGuid(),
             UserId = userId,
-            Token = GenerateSecureToken(),
+            Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
             ExpiresAt = DateTime.UtcNow.AddDays(7),
             CreatedAt = DateTime.UtcNow
         };
 
-        _db.RefreshTokens.Add(token);
-        await _db.SaveChangesAsync(ct);
-
+        await _db.RefreshTokens.InsertOneAsync(token, cancellationToken: ct);
         return token.Token;
-    }
-
-    private static string GenerateSecureToken()
-    {
-        return Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
-    }
-
-    private static void ValidatePassword(string password)
-    {
-        if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
-            throw new ArgumentException("Password must be at least 8 characters long.");
     }
 
     private async Task AuditLoginAsync(Guid userId, CancellationToken ct)
     {
-        _db.AuditLogs.Add(new AuditLog
+        await _db.AuditLogs.InsertOneAsync(new AuditLog
         {
-            Id = Guid.NewGuid(),
             ActorId = userId,
             ActorType = "User",
             Action = AuditAction.Login,
             Entity = "User",
-            EntityId = userId,
-            CreatedAt = DateTime.UtcNow
-        });
-        await _db.SaveChangesAsync(ct);
+            EntityId = userId
+        }, cancellationToken: ct);
     }
 }

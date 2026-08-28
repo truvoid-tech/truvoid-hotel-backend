@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+using MongoDB.Driver;
 using TruvoID.Core.DTOs;
 using TruvoID.Core.Interfaces;
 using TruvoID.Domain.Entities;
@@ -9,10 +9,10 @@ namespace TruvoID.Infrastructure.Services;
 
 public class OnboardingService : IOnboardingService
 {
-    private readonly TruvoIDDbContext _db;
+    private readonly MongoDbContext _db;
     private readonly IAuditService _auditService;
 
-    public OnboardingService(TruvoIDDbContext db, IAuditService auditService)
+    public OnboardingService(MongoDbContext db, IAuditService auditService)
     {
         _db = db;
         _auditService = auditService;
@@ -20,16 +20,18 @@ public class OnboardingService : IOnboardingService
 
     public async Task<OnboardingStatusResponse> GetStatusAsync(Guid institutionId, CancellationToken ct = default)
     {
-        var institution = await _db.Institutions
-            .Include(i => i.Users)
-            .FirstOrDefaultAsync(i => i.Id == institutionId, ct)
+        var institution = await _db.Institutions.Find(i => i.Id == institutionId).FirstOrDefaultAsync(ct)
             ?? throw new KeyNotFoundException("Institution not found.");
 
-        var walletBalance = await _db.WalletLedgerEntries
-            .Where(e => e.InstitutionId == institutionId)
-            .OrderByDescending(e => e.CreatedAt)
-            .Select(e => e.BalanceAfter)
+        var staffCount = (int)await _db.Users.CountDocumentsAsync(
+            u => u.InstitutionId == institutionId && u.Role != UserRole.Admin, cancellationToken: ct);
+
+        var lastEntry = await _db.WalletLedgerEntries
+            .Find(e => e.InstitutionId == institutionId)
+            .SortByDescending(e => e.CreatedAt)
             .FirstOrDefaultAsync(ct);
+
+        var walletBalance = lastEntry?.BalanceAfter ?? 0m;
 
         return new OnboardingStatusResponse
         {
@@ -43,60 +45,54 @@ public class OnboardingService : IOnboardingService
                 BusinessInfoSubmitted = !string.IsNullOrEmpty(institution.CacRcNumber),
                 ComplianceAccepted = institution.ComplianceAccepted,
                 WalletFunded = walletBalance > 0,
-                StaffCount = institution.Users.Count(u => u.Role != UserRole.Admin)
+                StaffCount = staffCount
             }
         };
     }
 
     public async Task UpdateInstitutionAsync(Guid institutionId, InstitutionSetupRequest request, CancellationToken ct = default)
     {
-        var institution = await _db.Institutions.FindAsync(new object[] { institutionId }, ct)
+        var institution = await _db.Institutions.Find(i => i.Id == institutionId).FirstOrDefaultAsync(ct)
             ?? throw new KeyNotFoundException("Institution not found.");
 
-        institution.Name = request.Name;
-        institution.ContactEmail = request.ContactEmail;
-        institution.ContactPhone = request.ContactPhone;
-        institution.UpdatedAt = DateTime.UtcNow;
+        var update = Builders<Institution>.Update
+            .Set(i => i.Name, request.Name)
+            .Set(i => i.ContactEmail, request.ContactEmail)
+            .Set(i => i.ContactPhone, request.ContactPhone)
+            .Set(i => i.UpdatedAt, DateTime.UtcNow);
 
-        // Advance onboarding step
         if (institution.OnboardingStep < 2)
-            institution.OnboardingStep = 2;
+            update = update.Set(i => i.OnboardingStep, 2);
 
-        await _db.SaveChangesAsync(ct);
+        await _db.Institutions.UpdateOneAsync(i => i.Id == institutionId, update, cancellationToken: ct);
 
-        await _auditService.LogAsync(
-            AuditAction.Updated,
-            nameof(Institution),
-            institutionId,
-            detailsJson: "{\"step\":\"institution_profile\"}",
-            ct: ct);
+        await _auditService.LogAsync(AuditAction.Updated, nameof(Institution), institutionId,
+            detailsJson: "{\"step\":\"institution_profile\"}", ct: ct);
     }
 
     public async Task UpdateBusinessInfoAsync(Guid institutionId, BusinessInfoRequest request, CancellationToken ct = default)
     {
-        var institution = await _db.Institutions.FindAsync(new object[] { institutionId }, ct)
+        var institution = await _db.Institutions.Find(i => i.Id == institutionId).FirstOrDefaultAsync(ct)
             ?? throw new KeyNotFoundException("Institution not found.");
 
-        institution.Name = request.LegalBusinessName ?? institution.Name;
-        institution.Type = request.Type;
-        institution.CacRcNumber = request.CacRcNumber;
-        institution.Address = request.Address;
-        institution.ExpectedMonthlyVolume = request.ExpectedMonthlyVolume;
-        institution.PrimaryUseCase = request.PrimaryUseCase;
-        institution.UpdatedAt = DateTime.UtcNow;
+        var update = Builders<Institution>.Update
+            .Set(i => i.CacRcNumber, request.CacRcNumber)
+            .Set(i => i.Address, request.Address)
+            .Set(i => i.ExpectedMonthlyVolume, request.ExpectedMonthlyVolume)
+            .Set(i => i.PrimaryUseCase, request.PrimaryUseCase)
+            .Set(i => i.UpdatedAt, DateTime.UtcNow);
 
-        // Advance onboarding step
+        if (request.LegalBusinessName != null)
+            update = update.Set(i => i.Name, request.LegalBusinessName);
+        update = update.Set(i => i.Type, request.Type);
+
         if (institution.OnboardingStep < 3)
-            institution.OnboardingStep = 3;
+            update = update.Set(i => i.OnboardingStep, 3);
 
-        await _db.SaveChangesAsync(ct);
+        await _db.Institutions.UpdateOneAsync(i => i.Id == institutionId, update, cancellationToken: ct);
 
-        await _auditService.LogAsync(
-            AuditAction.Updated,
-            nameof(Institution),
-            institutionId,
-            detailsJson: "{\"step\":\"business_verification\"}",
-            ct: ct);
+        await _auditService.LogAsync(AuditAction.Updated, nameof(Institution), institutionId,
+            detailsJson: "{\"step\":\"business_verification\"}", ct: ct);
     }
 
     public async Task AcceptComplianceAsync(Guid institutionId, ComplianceAcceptanceRequest request, CancellationToken ct = default)
@@ -104,36 +100,33 @@ public class OnboardingService : IOnboardingService
         if (!request.ResellerAcknowledged || !request.DataProcessingAgreed)
             throw new ArgumentException("Both compliance acknowledgments are required.");
 
-        var institution = await _db.Institutions.FindAsync(new object[] { institutionId }, ct)
+        var institution = await _db.Institutions.Find(i => i.Id == institutionId).FirstOrDefaultAsync(ct)
             ?? throw new KeyNotFoundException("Institution not found.");
 
-        institution.ComplianceAccepted = true;
-        institution.ComplianceAcceptedAt = DateTime.UtcNow;
-        institution.ResellerAcknowledged = request.ResellerAcknowledged;
-        institution.DataProcessingAgreed = request.DataProcessingAgreed;
-        institution.UpdatedAt = DateTime.UtcNow;
+        var update = Builders<Institution>.Update
+            .Set(i => i.ComplianceAccepted, true)
+            .Set(i => i.ComplianceAcceptedAt, DateTime.UtcNow)
+            .Set(i => i.ResellerAcknowledged, request.ResellerAcknowledged)
+            .Set(i => i.DataProcessingAgreed, request.DataProcessingAgreed)
+            .Set(i => i.UpdatedAt, DateTime.UtcNow);
 
-        // Advance onboarding step
         if (institution.OnboardingStep < 5)
-            institution.OnboardingStep = 5;
+            update = update.Set(i => i.OnboardingStep, 5);
 
-        await _db.SaveChangesAsync(ct);
+        await _db.Institutions.UpdateOneAsync(i => i.Id == institutionId, update, cancellationToken: ct);
 
-        await _auditService.LogAsync(
-            AuditAction.Updated,
-            nameof(Institution),
-            institutionId,
-            detailsJson: "{\"step\":\"compliance_acknowledgment\"}",
-            ct: ct);
+        await _auditService.LogAsync(AuditAction.Updated, nameof(Institution), institutionId,
+            detailsJson: "{\"step\":\"compliance_acknowledgment\"}", ct: ct);
     }
 
     public async Task<StaffInviteResponse> InviteStaffAsync(Guid institutionId, StaffInviteRequest request, CancellationToken ct = default)
     {
-        var institution = await _db.Institutions.FindAsync(new object[] { institutionId }, ct)
+        var institution = await _db.Institutions.Find(i => i.Id == institutionId).FirstOrDefaultAsync(ct)
             ?? throw new KeyNotFoundException("Institution not found.");
 
-        // Check for duplicate email within the institution
-        if (await _db.Users.AnyAsync(u => u.Email == request.Email && u.InstitutionId == institutionId, ct))
+        var exists = await _db.Users.CountDocumentsAsync(
+            u => u.Email == request.Email && u.InstitutionId == institutionId, cancellationToken: ct);
+        if (exists > 0)
             throw new InvalidOperationException("A user with this email already exists in this institution.");
 
         var user = new User
@@ -145,21 +138,13 @@ public class OnboardingService : IOnboardingService
             Status = UserStatus.PendingInvitation,
             DailyCallLimit = request.DailyCallLimit ?? 50
         };
+        await _db.Users.InsertOneAsync(user, cancellationToken: ct);
 
-        _db.Users.Add(user);
-        await _db.SaveChangesAsync(ct);
+        var instUpdate = Builders<Institution>.Update.Set(i => i.OnboardingStep, 7);
+        await _db.Institutions.UpdateOneAsync(i => i.Id == institutionId, instUpdate, cancellationToken: ct);
 
-        // Advance onboarding step
-        if (institution.OnboardingStep < 7)
-            institution.OnboardingStep = 7;
-        await _db.SaveChangesAsync(ct);
-
-        await _auditService.LogAsync(
-            AuditAction.Created,
-            nameof(User),
-            user.Id,
-            detailsJson: $"{{\"email\":\"{request.Email}\",\"role\":\"{request.Role}\"}}",
-            ct: ct);
+        await _auditService.LogAsync(AuditAction.Created, nameof(User), user.Id,
+            detailsJson: $"{{\"email\":\"{request.Email}\",\"role\":\"{request.Role}\"}}", ct: ct);
 
         return new StaffInviteResponse
         {
@@ -173,64 +158,52 @@ public class OnboardingService : IOnboardingService
 
     public async Task<bool> RemoveStaffAsync(Guid institutionId, Guid userId, CancellationToken ct = default)
     {
-        var user = await _db.Users
-            .FirstOrDefaultAsync(u => u.Id == userId && u.InstitutionId == institutionId, ct);
-
+        var user = await _db.Users.Find(u => u.Id == userId && u.InstitutionId == institutionId).FirstOrDefaultAsync(ct);
         if (user is null) return false;
 
-        // Don't allow removing the primary admin
         if (user.Role == UserRole.SuperAdmin)
             throw new InvalidOperationException("Cannot remove the primary admin.");
 
-        _db.Users.Remove(user);
-        await _db.SaveChangesAsync(ct);
+        await _db.Users.DeleteOneAsync(u => u.Id == userId, cancellationToken: ct);
 
-        await _auditService.LogAsync(
-            AuditAction.Deleted,
-            nameof(User),
-            userId,
-            ct: ct);
-
+        await _auditService.LogAsync(AuditAction.Deleted, nameof(User), userId, ct: ct);
         return true;
     }
 
     public async Task<List<StaffInviteResponse>> GetStaffAsync(Guid institutionId, CancellationToken ct = default)
     {
-        return await _db.Users
-            .Where(u => u.InstitutionId == institutionId)
-            .OrderBy(u => u.CreatedAt)
-            .Select(u => new StaffInviteResponse
-            {
-                UserId = u.Id,
-                Email = u.Email,
-                FullName = u.FullName ?? string.Empty,
-                Role = u.Role,
-                Status = u.Status
-            })
+        var users = await _db.Users
+            .Find(u => u.InstitutionId == institutionId)
+            .SortBy(u => u.CreatedAt)
             .ToListAsync(ct);
+
+        return users.Select(u => new StaffInviteResponse
+        {
+            UserId = u.Id,
+            Email = u.Email,
+            FullName = u.FullName ?? string.Empty,
+            Role = u.Role,
+            Status = u.Status
+        }).ToList();
     }
 
     public async Task CompleteOnboardingAsync(Guid institutionId, CancellationToken ct = default)
     {
-        var institution = await _db.Institutions.FindAsync(new object[] { institutionId }, ct)
+        var institution = await _db.Institutions.Find(i => i.Id == institutionId).FirstOrDefaultAsync(ct)
             ?? throw new KeyNotFoundException("Institution not found.");
 
-        // Validate all required steps are done
         if (!institution.ComplianceAccepted)
             throw new InvalidOperationException("Compliance must be accepted before completing onboarding.");
 
-        institution.OnboardingCompleted = true;
-        institution.OnboardingStep = 7;
-        institution.Status = InstitutionStatus.Active;
-        institution.UpdatedAt = DateTime.UtcNow;
+        var update = Builders<Institution>.Update
+            .Set(i => i.OnboardingCompleted, true)
+            .Set(i => i.OnboardingStep, 7)
+            .Set(i => i.Status, InstitutionStatus.Active)
+            .Set(i => i.UpdatedAt, DateTime.UtcNow);
 
-        await _db.SaveChangesAsync(ct);
+        await _db.Institutions.UpdateOneAsync(i => i.Id == institutionId, update, cancellationToken: ct);
 
-        await _auditService.LogAsync(
-            AuditAction.Updated,
-            nameof(Institution),
-            institutionId,
-            detailsJson: "{\"action\":\"onboarding_completed\"}",
-            ct: ct);
+        await _auditService.LogAsync(AuditAction.Updated, nameof(Institution), institutionId,
+            detailsJson: "{\"action\":\"onboarding_completed\"}", ct: ct);
     }
 }

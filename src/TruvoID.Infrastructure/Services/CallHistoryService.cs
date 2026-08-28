@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+using MongoDB.Driver;
 using TruvoID.Core.DTOs;
 using TruvoID.Core.Interfaces;
 using TruvoID.Domain.Enums;
@@ -8,12 +8,9 @@ namespace TruvoID.Infrastructure.Services;
 
 public class CallHistoryService : ICallHistoryService
 {
-    private readonly TruvoIDDbContext _db;
+    private readonly MongoDbContext _db;
 
-    public CallHistoryService(TruvoIDDbContext db)
-    {
-        _db = db;
-    }
+    public CallHistoryService(MongoDbContext db) => _db = db;
 
     public async Task<PaginatedResponse<CallHistoryResponse>> GetCallsAsync(
         Guid institutionId,
@@ -26,31 +23,40 @@ public class CallHistoryService : ICallHistoryService
         Guid? userId = null,
         CancellationToken ct = default)
     {
-        var query = _db.VerificationCalls
-            .Where(c => c.InstitutionId == institutionId);
+        var filter = Builders<Domain.Entities.VerificationCall>.Filter.Eq(c => c.InstitutionId, institutionId);
 
         if (type.HasValue)
-            query = query.Where(c => c.Type == type.Value);
+            filter = Builders<Domain.Entities.VerificationCall>.Filter.And(filter,
+                Builders<Domain.Entities.VerificationCall>.Filter.Eq(c => c.Type, type.Value));
 
         if (status.HasValue)
-            query = query.Where(c => c.Status == status.Value);
+            filter = Builders<Domain.Entities.VerificationCall>.Filter.And(filter,
+                Builders<Domain.Entities.VerificationCall>.Filter.Eq(c => c.Status, status.Value));
 
         if (fromDate.HasValue)
-            query = query.Where(c => c.CreatedAt >= fromDate.Value);
+            filter = Builders<Domain.Entities.VerificationCall>.Filter.And(filter,
+                Builders<Domain.Entities.VerificationCall>.Filter.Gte(c => c.CreatedAt, fromDate.Value));
 
         if (toDate.HasValue)
-            query = query.Where(c => c.CreatedAt <= toDate.Value);
+            filter = Builders<Domain.Entities.VerificationCall>.Filter.And(filter,
+                Builders<Domain.Entities.VerificationCall>.Filter.Lte(c => c.CreatedAt, toDate.Value));
 
         if (userId.HasValue)
-            query = query.Where(c => c.UserId == userId.Value);
+            filter = Builders<Domain.Entities.VerificationCall>.Filter.And(filter,
+                Builders<Domain.Entities.VerificationCall>.Filter.Eq(c => c.UserId, userId.Value));
 
-        var totalCount = await query.CountAsync(ct);
+        var totalCount = (int)await _db.VerificationCalls.CountDocumentsAsync(filter, cancellationToken: ct);
 
-        var items = await query
-            .OrderByDescending(c => c.CreatedAt)
+        var items = await _db.VerificationCalls
+            .Find(filter)
+            .SortByDescending(c => c.CreatedAt)
             .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(c => new CallHistoryResponse
+            .Limit(pageSize)
+            .ToListAsync(ct);
+
+        return new PaginatedResponse<CallHistoryResponse>
+        {
+            Items = items.Select(c => new CallHistoryResponse
             {
                 Id = c.Id,
                 Type = c.Type,
@@ -61,12 +67,7 @@ public class CallHistoryService : ICallHistoryService
                 UserId = c.UserId,
                 ApiKeyId = c.ApiKeyId,
                 CreatedAt = c.CreatedAt
-            })
-            .ToListAsync(ct);
-
-        return new PaginatedResponse<CallHistoryResponse>
-        {
-            Items = items,
+            }).ToList(),
             Page = page,
             PageSize = pageSize,
             TotalCount = totalCount

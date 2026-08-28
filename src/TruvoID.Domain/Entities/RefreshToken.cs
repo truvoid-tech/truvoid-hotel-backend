@@ -1,8 +1,7 @@
-namespace TruvoID.Infrastructure.Data;
+namespace TruvoID.Domain.Entities;
 
 /// <summary>
-/// Refresh token entity for JWT token rotation.
-/// Stored in a dedicated table, not exposed via Core layer.
+/// Refresh token for JWT token rotation. Stored as a standalone document.
 /// </summary>
 public class RefreshToken
 {

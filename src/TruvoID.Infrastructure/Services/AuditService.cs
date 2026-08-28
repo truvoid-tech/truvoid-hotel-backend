@@ -7,12 +7,9 @@ namespace TruvoID.Infrastructure.Services;
 
 public class AuditService : IAuditService
 {
-    private readonly TruvoIDDbContext _db;
+    private readonly MongoDbContext _db;
 
-    public AuditService(TruvoIDDbContext db)
-    {
-        _db = db;
-    }
+    public AuditService(MongoDbContext db) => _db = db;
 
     public async Task LogAsync(
         AuditAction action,
@@ -37,7 +34,6 @@ public class AuditService : IAuditService
             UserAgent = userAgent
         };
 
-        _db.AuditLogs.Add(log);
-        await _db.SaveChangesAsync(ct);
+        await _db.AuditLogs.InsertOneAsync(log, cancellationToken: ct);
     }
 }

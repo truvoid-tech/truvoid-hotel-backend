@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
+using MongoDB.Driver;
 using TruvoID.Infrastructure.Data;
 
 namespace TruvoID.API.Controllers;
@@ -8,15 +8,12 @@ namespace TruvoID.API.Controllers;
 [Route("")]
 public class HealthController : ControllerBase
 {
-    private readonly TruvoIDDbContext _db;
+    private readonly MongoDbContext _db;
 
-    public HealthController(TruvoIDDbContext db)
-    {
-        _db = db;
-    }
+    public HealthController(MongoDbContext db) => _db = db;
 
     [HttpGet("")]
-    public IActionResult Root() => Ok(new { status = "ok", service = "TruvoID API", version = "2.5.0" });
+    public IActionResult Root() => Ok(new { status = "ok", service = "TruvoID API", version = "3.0.0", database = "MongoDB" });
 
     [HttpGet("health")]
     public async Task<IActionResult> Health()
@@ -25,77 +22,25 @@ public class HealthController : ControllerBase
 
         try
         {
-            var canConnect = await _db.Database.CanConnectAsync();
-            result["database_connected"] = canConnect;
+            // Ping MongoDB
+            await _db.Users.CountDocumentsAsync(FilterDefinition<TruvoID.Domain.Entities.User>.Empty);
+            result["database_connected"] = true;
 
-            if (canConnect)
-            {
-                var tables = await ListTablesAsync();
-                result["tables"] = tables;
+            // Count collections
+            var collections = new[] { "institutions", "users", "api_keys", "wallet_ledger_entries", "verification_calls", "audit_logs", "pricing_rates", "refresh_tokens" };
+            result["collections"] = collections;
 
-                if (tables.Contains("users"))
-                {
-                    var userCount = await _db.Users.CountAsync();
-                    result["user_count"] = userCount;
-                }
-            }
+            var userCount = await _db.Users.CountDocumentsAsync(FilterDefinition<TruvoID.Domain.Entities.User>.Empty);
+            result["user_count"] = userCount;
         }
         catch (Exception ex)
         {
+            result["database_connected"] = false;
             result["error"] = ex.Message;
         }
 
-        result["status"] = result.ContainsKey("user_count") && (long)result["user_count"] > 0 ? "healthy" : "degraded";
+        result["status"] = result.ContainsKey("user_count") && Convert.ToInt64(result["user_count"]) > 0 ? "healthy" : "degraded";
         return Ok(result);
-    }
-
-    /// <summary>
-    /// Drop all tables and recreate from DbContext model, then seed.
-    /// Use only once to fix schema mismatches.
-    /// </summary>
-    [HttpPost("rebuild-schema")]
-    public async Task<IActionResult> RebuildSchema()
-    {
-        try
-        {
-            var conn = _db.Database.GetDbConnection();
-            await conn.OpenAsync();
-
-            // Drop all tables in public schema
-            using (var cmd = conn.CreateCommand())
-            {
-                cmd.CommandText = @"
-                    DO $$ DECLARE
-                        r RECORD;
-                    BEGIN
-                        FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
-                            EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
-                        END LOOP;
-                    END $$;";
-                await cmd.ExecuteNonQueryAsync();
-            }
-
-            // Create all tables from DbContext model
-            await _db.Database.EnsureCreatedAsync();
-
-            var tables = await ListTablesAsync();
-
-            // Seed
-            await SeedData.SeedAsync(_db);
-
-            var userCount = await _db.Users.CountAsync();
-
-            return Ok(new
-            {
-                message = "Schema rebuilt and seeded successfully",
-                tables = tables,
-                user_count = userCount
-            });
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new { error = ex.Message, stack = ex.StackTrace });
-        }
     }
 
     [HttpPost("seed-admin")]
@@ -103,26 +48,27 @@ public class HealthController : ControllerBase
     {
         try
         {
-            await SeedData.SeedAsync(_db);
-            var userCount = await _db.Users.CountAsync();
-            return Ok(new { message = "Seed completed", user_count = userCount });
+            var hasAdmin = await _db.Users.CountDocumentsAsync(u => u.Role == TruvoID.Domain.Enums.UserRole.PlatformAdmin) > 0;
+            if (hasAdmin)
+                return Ok(new { message = "PlatformAdmin already exists" });
+
+            var adminUser = new TruvoID.Domain.Entities.User
+            {
+                Email = "admin@truvoid.ng",
+                FullName = "TruvoID Platform Admin",
+                PhoneNumber = "+2348000000000",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@12345"),
+                Role = TruvoID.Domain.Enums.UserRole.PlatformAdmin,
+                Status = TruvoID.Domain.Enums.UserStatus.Active,
+                DailyCallLimit = null
+            };
+            await _db.Users.InsertOneAsync(adminUser);
+
+            return Ok(new { message = "PlatformAdmin seeded", email = "admin@truvoid.ng", password = "Admin@12345" });
         }
         catch (Exception ex)
         {
             return StatusCode(500, new { error = ex.Message, stack = ex.StackTrace });
         }
-    }
-
-    private async Task<List<string>> ListTablesAsync()
-    {
-        var conn = _db.Database.GetDbConnection();
-        await conn.OpenAsync();
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT tablename FROM pg_tables WHERE schemaname = 'public'";
-        using var reader = await cmd.ExecuteReaderAsync();
-        var tables = new List<string>();
-        while (await reader.ReadAsync())
-            tables.Add(reader.GetString(0));
-        return tables;
     }
 }

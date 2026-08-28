@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Microsoft.EntityFrameworkCore;
+using MongoDB.Driver;
 using TruvoID.Core.DTOs;
 using TruvoID.Core.Interfaces;
 using TruvoID.Domain.Entities;
@@ -10,20 +10,15 @@ using TruvoID.Infrastructure.Data;
 
 namespace TruvoID.Infrastructure.Services;
 
-/// <summary>
-/// Verification service — orchestrates the full verification call flow.
-/// For now, this is a stub that returns mock results.
-/// The real implementation will call the NIMC partner API.
-/// </summary>
 public class VerificationService : IVerificationService
 {
-    private readonly TruvoIDDbContext _db;
+    private readonly MongoDbContext _db;
     private readonly IWalletService _walletService;
     private readonly IPricingService _pricingService;
     private readonly IAuditService _auditService;
 
     public VerificationService(
-        TruvoIDDbContext db,
+        MongoDbContext db,
         IWalletService walletService,
         IPricingService pricingService,
         IAuditService auditService)
@@ -47,15 +42,14 @@ public class VerificationService : IVerificationService
         if (!string.IsNullOrEmpty(idempotencyKey))
         {
             var existing = await _db.VerificationCalls
-                .FirstOrDefaultAsync(c => c.IdempotencyKey == idempotencyKey && c.InstitutionId == institutionId, ct);
+                .Find(c => c.IdempotencyKey == idempotencyKey && c.InstitutionId == institutionId)
+                .FirstOrDefaultAsync(ct);
 
             if (existing is not null)
-            {
                 return MapToResponse(existing);
-            }
         }
 
-        // 2. Get price for this verification type
+        // 2. Get price
         decimal price;
         try
         {
@@ -84,7 +78,7 @@ public class VerificationService : IVerificationService
         }
 
         // 4. Create call record (pending)
-        var call = new TruvoID.Domain.Entities.VerificationCall
+        var call = new VerificationCall
         {
             InstitutionId = institutionId,
             UserId = userId,
@@ -95,17 +89,16 @@ public class VerificationService : IVerificationService
             AmountCharged = price,
             IdempotencyKey = idempotencyKey
         };
-
-        _db.VerificationCalls.Add(call);
-        await _db.SaveChangesAsync(ct);
+        await _db.VerificationCalls.InsertOneAsync(call, cancellationToken: ct);
 
         // 5. Debit wallet
         var debitResult = await _walletService.DebitAsync(institutionId, price, $"Verification: {type}", call.Id.ToString(), ct);
         if (!debitResult.Success)
         {
-            call.Status = VerificationStatus.Error;
-            call.ErrorMessage = debitResult.ErrorMessage;
-            await _db.SaveChangesAsync(ct);
+            var errorUpdate = Builders<VerificationCall>.Update
+                .Set(c => c.Status, VerificationStatus.Error)
+                .Set(c => c.ErrorMessage, debitResult.ErrorMessage);
+            await _db.VerificationCalls.UpdateOneAsync(c => c.Id == call.Id, errorUpdate, cancellationToken: ct);
 
             return new VerificationResponse
             {
@@ -116,30 +109,36 @@ public class VerificationService : IVerificationService
         }
 
         // 6. Link debit to call
-        call.LedgerEntryId = debitResult.LedgerEntryId;
-        await _db.SaveChangesAsync(ct);
+        var linkUpdate = Builders<VerificationCall>.Update.Set(c => c.LedgerEntryId, debitResult.LedgerEntryId);
+        await _db.VerificationCalls.UpdateOneAsync(c => c.Id == call.Id, linkUpdate, cancellationToken: ct);
 
         // 7. Call NIMC partner API (stubbed for now)
-        // TODO: Replace with real NIMC partner API call
-        call.Status = VerificationStatus.Match;
-        call.MatchedFieldsJson = JsonSerializer.Serialize(new { name = "Sample Match", dob = "1990-01-01", phone = "08012345678", gender = "Male" });
-        call.UpdatedAt = DateTime.UtcNow;
-        await _db.SaveChangesAsync(ct);
+        var resultUpdate = Builders<VerificationCall>.Update
+            .Set(c => c.Status, VerificationStatus.Match)
+            .Set(c => c.MatchedFieldsJson, JsonSerializer.Serialize(new { name = "Sample Match", dob = "1990-01-01", phone = "08012345678", gender = "Male" }))
+            .Set(c => c.UpdatedAt, DateTime.UtcNow);
+        await _db.VerificationCalls.UpdateOneAsync(c => c.Id == call.Id, resultUpdate, cancellationToken: ct);
 
         // 8. Audit log
         await _auditService.LogAsync(
             AuditAction.Verified,
-            nameof(TruvoID.Domain.Entities.VerificationCall),
+            nameof(VerificationCall),
             call.Id,
             userId ?? apiKeyId,
             userId.HasValue ? "User" : "ApiKey",
-            ipAddress: null,
             ct: ct);
 
-        return MapToResponse(call);
+        // Fetch updated call for response
+        var updatedCall = await _db.VerificationCalls.Find(c => c.Id == call.Id).FirstOrDefaultAsync(ct);
+
+        // Fetch balance after
+        var balanceAfter = debitResult.BalanceAfter;
+        var response = MapToResponse(updatedCall!);
+        response.WalletBalanceAfter = balanceAfter;
+        return response;
     }
 
-    private static VerificationResponse MapToResponse(TruvoID.Domain.Entities.VerificationCall call)
+    private static VerificationResponse MapToResponse(VerificationCall call)
     {
         VerificationData? data = null;
         if (!string.IsNullOrEmpty(call.MatchedFieldsJson))
@@ -156,10 +155,7 @@ public class VerificationService : IVerificationService
                     Gender = root.TryGetProperty("gender", out var gProp) ? gProp.GetString() : null
                 };
             }
-            catch
-            {
-                // If JSON parsing fails, return null data
-            }
+            catch { }
         }
 
         return new VerificationResponse
@@ -172,7 +168,7 @@ public class VerificationService : IVerificationService
             },
             Data = data,
             CallId = call.Id.ToString(),
-            WalletBalanceAfter = call.LedgerEntry?.BalanceAfter ?? 0,
+            WalletBalanceAfter = 0,
             ErrorCode = call.Status == VerificationStatus.Error ? ErrorCodes.UpstreamError : null,
             ErrorMessage = call.ErrorMessage
         };

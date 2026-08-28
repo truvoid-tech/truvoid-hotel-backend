@@ -1,25 +1,23 @@
-using Microsoft.EntityFrameworkCore;
+using MongoDB.Driver;
 using TruvoID.Core.DTOs;
 using TruvoID.Core.Interfaces;
+using TruvoID.Domain.Entities;
+using TruvoID.Domain.Enums;
 using TruvoID.Infrastructure.Data;
 
 namespace TruvoID.Infrastructure.Services;
 
 public class WalletService : IWalletService
 {
-    private readonly TruvoIDDbContext _db;
+    private readonly MongoDbContext _db;
 
-    public WalletService(TruvoIDDbContext db)
-    {
-        _db = db;
-    }
+    public WalletService(MongoDbContext db) => _db = db;
 
     public async Task<WalletBalanceResponse?> GetBalanceAsync(Guid institutionId, CancellationToken ct = default)
     {
-        var lastEntry = await _db.WalletLedgerEntries
-            .Where(e => e.InstitutionId == institutionId)
-            .OrderByDescending(e => e.CreatedAt)
-            .FirstOrDefaultAsync(ct);
+        var filter = Builders<WalletLedgerEntry>.Filter.Eq(e => e.InstitutionId, institutionId);
+        var sort = Builders<WalletLedgerEntry>.Sort.Descending(e => e.CreatedAt);
+        var lastEntry = await _db.WalletLedgerEntries.Find(filter).Sort(sort).FirstOrDefaultAsync(ct);
 
         if (lastEntry is null)
         {
@@ -51,7 +49,8 @@ public class WalletService : IWalletService
         if (!string.IsNullOrEmpty(idempotencyKey))
         {
             var existing = await _db.WalletLedgerEntries
-                .FirstOrDefaultAsync(e => e.ReferenceId == idempotencyKey && e.InstitutionId == institutionId, ct);
+                .Find(e => e.ReferenceId == idempotencyKey && e.InstitutionId == institutionId)
+                .FirstOrDefaultAsync(ct);
 
             if (existing is not null)
             {
@@ -64,135 +63,110 @@ public class WalletService : IWalletService
             }
         }
 
-        // Use transaction for atomic debit + balance update
-        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
-        try
+        // Get current balance
+        var filter = Builders<WalletLedgerEntry>.Filter.Eq(e => e.InstitutionId, institutionId);
+        var sort = Builders<WalletLedgerEntry>.Sort.Descending(e => e.CreatedAt);
+        var lastEntry = await _db.WalletLedgerEntries.Find(filter).Sort(sort).FirstOrDefaultAsync(ct);
+        var currentBalance = lastEntry?.BalanceAfter ?? 0m;
+
+        if (currentBalance < amount)
         {
-            var lastEntry = await _db.WalletLedgerEntries
-                .Where(e => e.InstitutionId == institutionId)
-                .OrderByDescending(e => e.CreatedAt)
-                .FirstOrDefaultAsync(ct);
-
-            var currentBalance = lastEntry?.BalanceAfter ?? 0m;
-
-            if (currentBalance < amount)
-            {
-                await transaction.RollbackAsync(ct);
-                return new WalletLedgerEntryResult
-                {
-                    Success = false,
-                    ErrorMessage = "Insufficient wallet balance."
-                };
-            }
-
-            var entry = new TruvoID.Domain.Entities.WalletLedgerEntry
-            {
-                InstitutionId = institutionId,
-                Type = TruvoID.Domain.Enums.WalletTransactionType.Debit,
-                Amount = amount,
-                BalanceAfter = currentBalance - amount,
-                ReferenceId = idempotencyKey,
-                Description = description
-            };
-
-            _db.WalletLedgerEntries.Add(entry);
-            await _db.SaveChangesAsync(ct);
-            await transaction.CommitAsync(ct);
-
             return new WalletLedgerEntryResult
             {
-                Success = true,
-                LedgerEntryId = entry.Id,
-                BalanceAfter = entry.BalanceAfter
+                Success = false,
+                ErrorMessage = "Insufficient wallet balance."
             };
         }
-        catch
+
+        var entry = new WalletLedgerEntry
         {
-            await transaction.RollbackAsync(ct);
-            throw;
-        }
+            InstitutionId = institutionId,
+            Type = WalletTransactionType.Debit,
+            Amount = amount,
+            BalanceAfter = currentBalance - amount,
+            ReferenceId = idempotencyKey,
+            Description = description
+        };
+
+        await _db.WalletLedgerEntries.InsertOneAsync(entry, cancellationToken: ct);
+
+        return new WalletLedgerEntryResult
+        {
+            Success = true,
+            LedgerEntryId = entry.Id,
+            BalanceAfter = entry.BalanceAfter
+        };
     }
 
     public async Task<WalletLedgerEntryResult> CreditAsync(Guid institutionId, decimal amount, string description, string? referenceId = null, CancellationToken ct = default)
     {
-        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
-        try
+        var filter = Builders<WalletLedgerEntry>.Filter.Eq(e => e.InstitutionId, institutionId);
+        var sort = Builders<WalletLedgerEntry>.Sort.Descending(e => e.CreatedAt);
+        var lastEntry = await _db.WalletLedgerEntries.Find(filter).Sort(sort).FirstOrDefaultAsync(ct);
+        var currentBalance = lastEntry?.BalanceAfter ?? 0m;
+
+        var entry = new WalletLedgerEntry
         {
-            var lastEntry = await _db.WalletLedgerEntries
-                .Where(e => e.InstitutionId == institutionId)
-                .OrderByDescending(e => e.CreatedAt)
-                .FirstOrDefaultAsync(ct);
+            InstitutionId = institutionId,
+            Type = WalletTransactionType.Credit,
+            Amount = amount,
+            BalanceAfter = currentBalance + amount,
+            ReferenceId = referenceId,
+            Description = description
+        };
 
-            var currentBalance = lastEntry?.BalanceAfter ?? 0m;
+        await _db.WalletLedgerEntries.InsertOneAsync(entry, cancellationToken: ct);
 
-            var entry = new TruvoID.Domain.Entities.WalletLedgerEntry
-            {
-                InstitutionId = institutionId,
-                Type = TruvoID.Domain.Enums.WalletTransactionType.Credit,
-                Amount = amount,
-                BalanceAfter = currentBalance + amount,
-                ReferenceId = referenceId,
-                Description = description
-            };
-
-            _db.WalletLedgerEntries.Add(entry);
-            await _db.SaveChangesAsync(ct);
-            await transaction.CommitAsync(ct);
-
-            return new WalletLedgerEntryResult
-            {
-                Success = true,
-                LedgerEntryId = entry.Id,
-                BalanceAfter = entry.BalanceAfter
-            };
-        }
-        catch
+        return new WalletLedgerEntryResult
         {
-            await transaction.RollbackAsync(ct);
-            throw;
-        }
+            Success = true,
+            LedgerEntryId = entry.Id,
+            BalanceAfter = entry.BalanceAfter
+        };
     }
 
     public async Task<bool> ReverseAsync(Guid ledgerEntryId, string reason, CancellationToken ct = default)
     {
-        var original = await _db.WalletLedgerEntries.FindAsync(new object[] { ledgerEntryId }, ct);
+        var original = await _db.WalletLedgerEntries
+            .Find(e => e.Id == ledgerEntryId)
+            .FirstOrDefaultAsync(ct);
+
         if (original is null) return false;
 
-        // Create reversal entry
-        var reversal = new TruvoID.Domain.Entities.WalletLedgerEntry
+        var reversal = new WalletLedgerEntry
         {
             InstitutionId = original.InstitutionId,
-            Type = TruvoID.Domain.Enums.WalletTransactionType.Refund,
+            Type = WalletTransactionType.Refund,
             Amount = original.Amount,
-            BalanceAfter = original.Type == TruvoID.Domain.Enums.WalletTransactionType.Debit
+            BalanceAfter = original.Type == WalletTransactionType.Debit
                 ? original.BalanceAfter + original.Amount
                 : original.BalanceAfter - original.Amount,
             ReferenceId = original.Id.ToString(),
             Description = $"Reversal: {reason}"
         };
 
-        _db.WalletLedgerEntries.Add(reversal);
-        await _db.SaveChangesAsync(ct);
+        await _db.WalletLedgerEntries.InsertOneAsync(reversal, cancellationToken: ct);
         return true;
     }
 
     public async Task<List<WalletTransactionResponse>> GetTransactionsAsync(Guid institutionId, int page = 1, int pageSize = 20, CancellationToken ct = default)
     {
-        return await _db.WalletLedgerEntries
-            .Where(e => e.InstitutionId == institutionId)
-            .OrderByDescending(e => e.CreatedAt)
+        var entries = await _db.WalletLedgerEntries
+            .Find(e => e.InstitutionId == institutionId)
+            .SortByDescending(e => e.CreatedAt)
             .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(e => new WalletTransactionResponse
-            {
-                Id = e.Id,
-                Type = e.Type,
-                Amount = e.Amount,
-                BalanceAfter = e.BalanceAfter,
-                Description = e.Description,
-                ReferenceId = e.ReferenceId,
-                CreatedAt = e.CreatedAt
-            })
+            .Limit(pageSize)
             .ToListAsync(ct);
+
+        return entries.Select(e => new WalletTransactionResponse
+        {
+            Id = e.Id,
+            Type = e.Type,
+            Amount = e.Amount,
+            BalanceAfter = e.BalanceAfter,
+            Description = e.Description,
+            ReferenceId = e.ReferenceId,
+            CreatedAt = e.CreatedAt
+        }).ToList();
     }
 }
