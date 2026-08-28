@@ -17,11 +17,28 @@ public static class ServiceCollectionExtensions
         services.AddDbContext<TruvoIDDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
 
-        // Redis
+        // Redis — only connect if a real (non-localhost) URL is provided
+        // In Railway, set ConnectionStrings__Redis or leave it empty to skip
         var redisConnection = configuration.GetConnectionString("Redis");
-        if (!string.IsNullOrEmpty(redisConnection))
+        var isRedisConfigured = !string.IsNullOrWhiteSpace(redisConnection)
+                                && !redisConnection.Contains("localhost", StringComparison.OrdinalIgnoreCase);
+
+        if (isRedisConfigured)
         {
-            services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConnection));
+            try
+            {
+                var mux = ConnectionMultiplexer.Connect(redisConnection!);
+                services.AddSingleton<IConnectionMultiplexer>(mux);
+                Console.WriteLine("[Startup] Redis connected.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Startup] Redis connection failed: {ex.Message}. Continuing without Redis.");
+            }
+        }
+        else
+        {
+            Console.WriteLine("[Startup] Redis not configured or is localhost — skipping. Rate limiting and balance cache disabled.");
         }
 
         // Business services
