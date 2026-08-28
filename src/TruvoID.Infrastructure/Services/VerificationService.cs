@@ -311,10 +311,11 @@ public class VerificationService : IVerificationService
 
         foreach (var envKey in Environment.GetEnvironmentVariables().Keys)
         {
-            var k = envKey.ToString()!.Trim();
+            var rawKey = envKey.ToString()!;
+            var k = rawKey.Trim();
             if (k.StartsWith("IDACCESS_API_KEY", StringComparison.OrdinalIgnoreCase))
             {
-                var v = Environment.GetEnvironmentVariable(k);
+                var v = Environment.GetEnvironmentVariable(rawKey);
                 Console.WriteLine($"[VERIFY] Found key via fuzzy: {k}");
                 return v;
             }
