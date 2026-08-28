@@ -9,8 +9,13 @@ namespace TruvoID.API.Controllers;
 public class HealthController : ControllerBase
 {
     private readonly MongoDbContext _db;
+    private readonly IConfiguration _config;
 
-    public HealthController(MongoDbContext db) => _db = db;
+    public HealthController(MongoDbContext db, IConfiguration config)
+    {
+        _db = db;
+        _config = config;
+    }
 
     [HttpGet("")]
     public IActionResult Root() => Ok(new { status = "ok", service = "TruvoID API", version = "3.0.0", database = "MongoDB" });
