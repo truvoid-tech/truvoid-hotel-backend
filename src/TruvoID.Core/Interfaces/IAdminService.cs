@@ -2,10 +2,6 @@ using TruvoID.Core.DTOs;
 
 namespace TruvoID.Core.Interfaces;
 
-/// <summary>
-/// Platform admin service — internal TruvoID ops dashboard.
-/// Provides aggregate data across all institutions.
-/// </summary>
 public interface IAdminService
 {
     // Overview
@@ -27,4 +23,11 @@ public interface IAdminService
     // Pricing
     Task<List<AdminPricingDto>> GetPricingAsync(CancellationToken ct = default);
     Task UpdatePricingAsync(string type, UpdatePricingRequest request, CancellationToken ct = default);
+
+    // Admin Management
+    Task<List<AdminUserDto>> GetAdminsAsync(CancellationToken ct = default);
+    Task<AdminUserDto> InviteAdminAsync(InviteAdminRequest request, CancellationToken ct = default);
+
+    // Audit Log
+    Task<List<AuditLogEntryDto>> GetAuditLogAsync(int page = 1, int pageSize = 50, CancellationToken ct = default);
 }

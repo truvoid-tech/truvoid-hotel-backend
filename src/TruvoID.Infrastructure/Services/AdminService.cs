@@ -366,4 +366,93 @@ public class AdminService : IAdminService
         InstitutionStatus.Closed => "Closed",
         _ => status.ToString()
     };
+
+    // ──────────────────────────── Admin Management ────────────────────────────
+
+    public async Task<List<AdminUserDto>> GetAdminsAsync(CancellationToken ct = default)
+    {
+        var admins = await _db.Users
+            .Find(u => u.Role == TruvoID.Domain.Enums.UserRole.Admin || u.Role == TruvoID.Domain.Enums.UserRole.PlatformAdmin)
+            .SortByDescending(u => u.CreatedAt)
+            .ToListAsync(ct);
+
+        return admins.Select(u => new AdminUserDto
+        {
+            UserId = u.Id,
+            Email = u.Email,
+            FullName = u.FullName ?? "",
+            Role = u.Role.ToString(),
+            IsActive = u.Status == TruvoID.Domain.Enums.UserStatus.Active,
+            CreatedAt = u.CreatedAt,
+            LastLoginAt = u.LastLoginAt
+        }).ToList();
+    }
+
+    public async Task<AdminUserDto> InviteAdminAsync(InviteAdminRequest request, CancellationToken ct = default)
+    {
+        var exists = await _db.Users.CountDocumentsAsync(u => u.Email == request.Email, cancellationToken: ct);
+        if (exists > 0)
+            throw new InvalidOperationException("A user with this email already exists.");
+
+        var user = new TruvoID.Domain.Entities.User
+        {
+            Email = request.Email,
+            FullName = request.FullName,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+            Role = TruvoID.Domain.Enums.UserRole.Admin,
+            Status = TruvoID.Domain.Enums.UserStatus.Active
+        };
+
+        await _db.Users.InsertOneAsync(user, cancellationToken: ct);
+
+        await _db.AuditLogs.InsertOneAsync(new TruvoID.Domain.Entities.AuditLog
+        {
+            ActorType = "PlatformAdmin",
+            Action = TruvoID.Domain.Enums.AuditAction.Created,
+            Entity = "User",
+            EntityId = user.Id,
+            DetailsJson = "{\"email\":\"" + request.Email + "\",\"role\":\"Admin\"}"
+        }, cancellationToken: ct);
+
+        return new AdminUserDto
+        {
+            UserId = user.Id,
+            Email = user.Email,
+            FullName = user.FullName ?? "",
+            Role = user.Role.ToString(),
+            IsActive = true,
+            CreatedAt = user.CreatedAt
+        };
+    }
+
+    // ──────────────────────────── Audit Log ────────────────────────────
+
+    public async Task<List<AuditLogEntryDto>> GetAuditLogAsync(int page = 1, int pageSize = 50, CancellationToken ct = default)
+    {
+        var entries = await _db.AuditLogs
+            .Find(_ => true)
+            .SortByDescending(a => a.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Limit(pageSize)
+            .ToListAsync(ct);
+
+        var actorIds = entries.Where(a => a.ActorId.HasValue).Select(a => a.ActorId!.Value).Distinct().ToList();
+        var actors = new Dictionary<Guid, string>();
+        if (actorIds.Any())
+        {
+            var users = await _db.Users.Find(u => actorIds.Contains(u.Id)).ToListAsync(ct);
+            actors = users.ToDictionary(u => u.Id, u => u.Email);
+        }
+
+        return entries.Select(e => new AuditLogEntryDto
+        {
+            Id = e.Id,
+            ActorEmail = e.ActorId.HasValue && actors.ContainsKey(e.ActorId.Value) ? actors[e.ActorId.Value] : null,
+            ActorType = e.ActorType,
+            Action = e.Action.ToString(),
+            Entity = e.Entity,
+            DetailsJson = e.DetailsJson,
+            CreatedAt = e.CreatedAt
+        }).ToList();
+    }
 }

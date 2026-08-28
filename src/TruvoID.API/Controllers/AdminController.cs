@@ -159,4 +159,39 @@ public class AdminController : ControllerBase
         await _adminService.UpdatePricingAsync(type, request, ct);
         return NoContent();
     }
+
+    // ──────────────────────────── Admin Management ────────────────────────────
+
+    [HttpGet("admins")]
+    public async Task<IActionResult> GetAdmins(CancellationToken ct)
+    {
+        var admins = await _adminService.GetAdminsAsync(ct);
+        return Ok(admins);
+    }
+
+    [HttpPost("admins/invite")]
+    public async Task<IActionResult> InviteAdmin([FromBody] InviteAdminRequest request, CancellationToken ct)
+    {
+        try
+        {
+            var admin = await _adminService.InviteAdminAsync(request, ct);
+            return Ok(admin);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    // ──────────────────────────── Audit Log ────────────────────────────
+
+    [HttpGet("audit")]
+    public async Task<IActionResult> GetAuditLog(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        CancellationToken ct = default)
+    {
+        var log = await _adminService.GetAuditLogAsync(page, pageSize, ct);
+        return Ok(log);
+    }
 }
