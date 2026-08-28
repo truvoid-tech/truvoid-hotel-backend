@@ -126,10 +126,13 @@ public class VerificationService : IVerificationService
         // 7. Call IDaccess partner API
         try
         {
-            var apiKey = _configuration["IDACCESS_API_KEY"] ?? _configuration["IDACCESS-API-KEY"];
+            var apiKey = _configuration["IDACCESS_API_KEY"]
+                ?? _configuration["IDACCESS-API-KEY"]
+                ?? Environment.GetEnvironmentVariable("IDACCESS_API_KEY")
+                ?? Environment.GetEnvironmentVariable("IDACCESS-API-KEY");
             if (string.IsNullOrEmpty(apiKey))
             {
-                throw new InvalidOperationException("IDACCESS_API_KEY not configured.");
+                throw new InvalidOperationException($"IDACCESS_API_KEY not configured. Checked: IDACCESS_API_KEY, IDACCESS-API-KEY in both IConfiguration and Environment.");
             }
 
             var client = _httpClientFactory.CreateClient("idaccess");
