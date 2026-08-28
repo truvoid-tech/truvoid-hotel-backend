@@ -126,73 +126,88 @@ public class VerificationService : IVerificationService
         // 7. Call IDaccess partner API
         try
         {
-            var apiKey = _configuration["IDACCESS_API_KEY"]
-                ?? _configuration["IDACCESS-API-KEY"]
-                ?? Environment.GetEnvironmentVariable("IDACCESS_API_KEY")
-                ?? Environment.GetEnvironmentVariable("IDACCESS-API-KEY")
-                ?? FindEnvVarContaining("IDACCESS_API_KEY");
+            var apiKey = ResolveIdaccessApiKey();
             if (string.IsNullOrEmpty(apiKey))
             {
                 throw new InvalidOperationException($"IDACCESS_API_KEY not configured. Checked: IDACCESS_API_KEY, IDACCESS-API-KEY in both IConfiguration and Environment.");
             }
 
             var client = _httpClientFactory.CreateClient("idaccess");
-            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey.Trim());
 
-            // Determine endpoint based on verification type
-            var endpoint = type switch
+            // Per IDaccess docs: Idempotency-Key header required
+            var upstreamIdempotencyKey = idempotencyKey ?? $"req_{call.Id:N}";
+            client.DefaultRequestHeaders.Remove("Idempotency-Key");
+            client.DefaultRequestHeaders.Add("Idempotency-Key", upstreamIdempotencyKey);
+
+            // Determine endpoint and body field per IDaccess docs
+            string endpoint = type switch
             {
-                VerificationType.Nin => "nin/verify",
-                VerificationType.Bvn => "bvn/verify",
-                VerificationType.Phone => "phone/verify",
+                VerificationType.Nin => "identity/nin",
+                VerificationType.Bvn => "identity/bvn",
+                VerificationType.Phone => "identity/phone",
+                _ => throw new NotSupportedException($"Verification type {type} is not supported.")
+            };
+            string bodyField = type switch
+            {
+                VerificationType.Nin => "nin",
+                VerificationType.Bvn => "bvn",
+                VerificationType.Phone => "phone",
                 _ => throw new NotSupportedException($"Verification type {type} is not supported.")
             };
 
-            var requestBody = new { number = subjectRef };
+            var requestBody = new Dictionary<string, string> { { bodyField, subjectRef.Trim() } };
+            Console.WriteLine($"[VERIFY] Calling {IdaccessBaseUrl}/{endpoint}");
             var httpResponse = await client.PostAsJsonAsync($"{IdaccessBaseUrl}/{endpoint}", requestBody, ct);
             var responseContent = await httpResponse.Content.ReadAsStringAsync(ct);
+            Console.WriteLine($"[VERIFY] HTTP {(int)httpResponse.StatusCode}: {responseContent}");
 
             if (httpResponse.IsSuccessStatusCode)
             {
                 var resultDoc = JsonDocument.Parse(responseContent);
                 var resultRoot = resultDoc.RootElement;
+                var apiSuccess = resultRoot.TryGetProperty("success", out var successProp) && successProp.ValueKind == JsonValueKind.True;
 
-                // Extract matched fields from IDaccess response
-                string? firstName = resultRoot.TryGetProperty("first_name", out var fn) ? fn.GetString() : null;
-                string? middleName = resultRoot.TryGetProperty("middle_name", out var mn) ? mn.GetString() : null;
-                string? surname = resultRoot.TryGetProperty("last_name", out var ln) ? ln.GetString() : null;
-
-                string? fullName = firstName;
-                if (!string.IsNullOrEmpty(surname))
-                    fullName = string.IsNullOrEmpty(firstName) ? surname : $"{firstName} {surname}";
-                if (!string.IsNullOrEmpty(middleName) && fullName != null)
-                    fullName = $"{fullName} {middleName}";
-
-                var dob = resultRoot.TryGetProperty("date_of_birth", out var dobProp) ? dobProp.GetString() : null;
-                var phone = resultRoot.TryGetProperty("phone_number", out var phProp) ? phProp.GetString() : null;
-                var gender = resultRoot.TryGetProperty("gender", out var gProp) ? gProp.GetString() : null;
-                var photo = resultRoot.TryGetProperty("photo", out var photoProp) ? photoProp.GetString() : null;
-
-                var matchedData = new
+                if (apiSuccess && resultRoot.TryGetProperty("data", out var dataProp) && dataProp.ValueKind == JsonValueKind.Object)
                 {
-                    name = fullName,
-                    dob,
-                    phone,
-                    gender,
-                    photo
-                };
+                    var matchedData = new
+                    {
+                        name = dataProp.TryGetProperty("name", out var nProp) ? nProp.GetString() : null,
+                        dob = dataProp.TryGetProperty("dob", out var dProp) ? dProp.GetString() : null,
+                        phone = dataProp.TryGetProperty("phone", out var pProp) ? pProp.GetString() : null,
+                        gender = dataProp.TryGetProperty("gender", out var gProp) ? gProp.GetString() : null,
+                        photo = dataProp.TryGetProperty("photo", out var phProp) ? phProp.GetString() : null
+                    };
+                    var resultUpdate = Builders<VerificationCall>.Update
+                        .Set(c => c.Status, VerificationStatus.Match)
+                        .Set(c => c.MatchedFieldsJson, JsonSerializer.Serialize(matchedData))
+                        .Set(c => c.RawResponseJson, responseContent)
+                        .Set(c => c.UpdatedAt, DateTime.UtcNow);
+                    await _db.VerificationCalls.UpdateOneAsync(c => c.Id == call.Id, resultUpdate, cancellationToken: ct);
+                }
+                else
+                {
+                    var errorMessage = "Verification returned no match.";
+                    if (resultRoot.TryGetProperty("error", out var errObj) && errObj.ValueKind == JsonValueKind.Object)
+                        if (errObj.TryGetProperty("message", out var mp))
+                            errorMessage = mp.GetString() ?? errorMessage;
 
-                var resultUpdate = Builders<VerificationCall>.Update
-                    .Set(c => c.Status, VerificationStatus.Match)
-                    .Set(c => c.MatchedFieldsJson, JsonSerializer.Serialize(matchedData))
-                    .Set(c => c.RawResponseJson, responseContent)
-                    .Set(c => c.UpdatedAt, DateTime.UtcNow);
-                await _db.VerificationCalls.UpdateOneAsync(c => c.Id == call.Id, resultUpdate, cancellationToken: ct);
+                    var isNoMatch = errorMessage.Contains("no match", StringComparison.OrdinalIgnoreCase);
+                    var callStatus = isNoMatch ? VerificationStatus.NoMatch : VerificationStatus.Error;
+                    var errUpdate = Builders<VerificationCall>.Update
+                        .Set(c => c.Status, callStatus)
+                        .Set(c => c.ErrorMessage, errorMessage)
+                        .Set(c => c.RawResponseJson, responseContent)
+                        .Set(c => c.UpdatedAt, DateTime.UtcNow);
+                    await _db.VerificationCalls.UpdateOneAsync(c => c.Id == call.Id, errUpdate, cancellationToken: ct);
+                    if (!isNoMatch)
+                        await _walletService.CreditAsync(institutionId, price, $"Refund: {type} upstream error", call.Id.ToString(), ct);
+                }
             }
             else
             {
                 // Upstream returned an error
-                var errorMessage = "Upstream verification failed.";
+                var errorMessage = $"Upstream returned HTTP {(int)httpResponse.StatusCode}.";
                 try
                 {
                     var errDoc = JsonDocument.Parse(responseContent);
@@ -201,9 +216,7 @@ public class VerificationService : IVerificationService
                 }
                 catch { }
 
-                var status = responseContent.Contains("no match", StringComparison.OrdinalIgnoreCase)
-                    ? VerificationStatus.NoMatch
-                    : VerificationStatus.Error;
+                var status = VerificationStatus.Error;
 
                 var errorUpdate = Builders<VerificationCall>.Update
                     .Set(c => c.Status, status)
@@ -288,14 +301,22 @@ public class VerificationService : IVerificationService
     }
 
     
-    private static string? FindEnvVarContaining(string partialName)
+    private string? ResolveIdaccessApiKey()
     {
-        foreach (var key in Environment.GetEnvironmentVariables().Keys)
+        var key = _configuration["IDACCESS_API_KEY"]
+            ?? _configuration["IDACCESS-API-KEY"]
+            ?? Environment.GetEnvironmentVariable("IDACCESS_API_KEY")
+            ?? Environment.GetEnvironmentVariable("IDACCESS-API-KEY");
+        if (!string.IsNullOrEmpty(key)) return key;
+
+        foreach (var envKey in Environment.GetEnvironmentVariables().Keys)
         {
-            var keyStr = key.ToString()!.Trim();
-            if (keyStr.StartsWith(partialName, StringComparison.OrdinalIgnoreCase))
+            var k = envKey.ToString()!.Trim();
+            if (k.StartsWith("IDACCESS_API_KEY", StringComparison.OrdinalIgnoreCase))
             {
-                return Environment.GetEnvironmentVariable(key.ToString()!);
+                var v = Environment.GetEnvironmentVariable(k);
+                Console.WriteLine($"[VERIFY] Found key via fuzzy: {k}");
+                return v;
             }
         }
         return null;
