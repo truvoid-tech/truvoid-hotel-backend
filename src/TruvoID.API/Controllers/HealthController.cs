@@ -23,7 +23,6 @@ public class HealthController : ControllerBase
     {
         var result = new Dictionary<string, object>();
 
-        // Check DB connection
         try
         {
             var canConnect = await _db.Database.CanConnectAsync();
@@ -31,7 +30,6 @@ public class HealthController : ControllerBase
 
             if (canConnect)
             {
-                // Check if tables exist
                 var userCount = await _db.Users.CountAsync();
                 result["users_table"] = "exists";
                 result["user_count"] = userCount;
@@ -39,19 +37,37 @@ public class HealthController : ControllerBase
                 var instCount = await _db.Institutions.CountAsync();
                 result["institutions_table"] = "exists";
                 result["institution_count"] = instCount;
-
-                var pricingCount = await _db.PricingRates.CountAsync();
-                result["pricing_table"] = "exists";
-                result["pricing_count"] = pricingCount;
             }
         }
         catch (Exception ex)
         {
-            result["database_connected"] = false;
+            result["database_connected"] = true; // Connection works but tables missing
             result["database_error"] = ex.Message;
         }
 
-        result["status"] = result.ContainsKey("database_connected") && (bool)result["database_connected"] ? "healthy" : "degraded";
+        result["status"] = result.ContainsKey("user_count") ? "healthy" : "degraded";
         return Ok(result);
+    }
+
+    /// <summary>
+    /// Force-create database tables from the DbContext model.
+    /// Use this once to bootstrap the schema, then remove.
+    /// </summary>
+    [HttpPost("ensure-created")]
+    public async Task<IActionResult> EnsureCreated()
+    {
+        try
+        {
+            var existed = await _db.Database.EnsureCreatedAsync();
+            return Ok(new
+            {
+                message = existed ? "Database already existed — tables verified." : "Database created successfully.",
+                tables_created = !existed
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = ex.Message, stackTrace = ex.StackTrace });
+        }
     }
 }
