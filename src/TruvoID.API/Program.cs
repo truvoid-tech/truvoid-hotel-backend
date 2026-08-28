@@ -102,13 +102,29 @@ try
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<TruvoIDDbContext>();
-    await db.Database.MigrateAsync();
+
+    // Try migration first, fall back to EnsureCreated if migrations are missing
+    try
+    {
+        await db.Database.MigrateAsync();
+        Console.WriteLine("[Startup] Database migrated successfully.");
+    }
+    catch (Exception migrateEx)
+    {
+        Console.WriteLine($"[Startup] MigrateAsync failed ({migrateEx.Message}). Trying EnsureCreated...");
+
+        // EnsureCreated creates the schema from the current model — no migration files needed
+        // Downside: won't apply future migrations, but works for initial setup
+        await db.Database.EnsureCreatedAsync();
+        Console.WriteLine("[Startup] Database created/verified via EnsureCreated.");
+    }
+
     await SeedData.SeedAsync(db);
-    Console.WriteLine("[Startup] Database migrated and seeded successfully.");
+    Console.WriteLine("[Startup] Database seeded successfully.");
 }
 catch (Exception ex)
 {
-    Console.WriteLine($"[Startup] Database migration/seed FAILED: {ex.Message}");
+    Console.WriteLine($"[Startup] Database setup FAILED: {ex.Message}");
     Console.WriteLine($"[Startup] Stack trace: {ex.StackTrace}");
     Console.WriteLine("[Startup] The API will start anyway — database operations will fail until the DB is accessible.");
 }
