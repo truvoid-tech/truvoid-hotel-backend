@@ -250,4 +250,18 @@ public class AdminController : ControllerBase
             return NotFound(new { message = ex.Message });
         }
     }
+
+    /// <summary>
+    /// Directly credit an institution wallet (admin/testing use).
+    /// </summary>
+    [HttpPost("wallets/{institutionId:guid}/credit")]
+    public async Task<IActionResult> CreditWallet(Guid institutionId, [FromBody] CreditWalletRequest request, CancellationToken ct)
+    {
+        if (request.Amount <= 0)
+            return BadRequest(new { code = "INVALID_INPUT", message = "Amount must be greater than zero." });
+
+        await _adminService.CreditInstitutionWalletAsync(institutionId, request.Amount, request.Description ?? "Admin credit", ct);
+        return NoContent();
+    }
+
 }

@@ -145,3 +145,9 @@ public record UpdateRoleRequest
 {
     public string Role { get; init; } = string.Empty;
 }
+
+public class CreditWalletRequest
+{
+    public decimal Amount { get; set; }
+    public string? Description { get; set; }
+}

@@ -555,4 +555,25 @@ public class AdminService : IAdminService
             DetailsJson = $"{{\"type\":\"low_balance_alert\",\"email\":\"{inst.ContactEmail ?? ""}\"}}"
         }, cancellationToken: ct);
     }
+
+    public async Task CreditInstitutionWalletAsync(Guid institutionId, decimal amount, string description, CancellationToken ct = default)
+    {
+        var latestEntry = await _db.WalletLedgerEntries
+            .Find(e => e.InstitutionId == institutionId)
+            .SortByDescending(e => e.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+        var currentBalance = latestEntry?.BalanceAfter ?? 0m;
+        var newBalance = currentBalance + amount;
+
+        await _db.WalletLedgerEntries.InsertOneAsync(new WalletLedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            InstitutionId = institutionId,
+            Type = WalletTransactionType.Credit,
+            Amount = amount,
+            BalanceAfter = newBalance,
+            Description = description,
+            CreatedAt = DateTime.UtcNow
+        }, cancellationToken: ct);
+    }
 }

@@ -35,4 +35,7 @@ public interface IAdminService
     // Low Balance Alerts
     Task<List<LowBalanceAlertDto>> GetLowBalanceAlertsAsync(decimal threshold = 5000m, CancellationToken ct = default);
     Task SendLowBalanceNotificationAsync(Guid institutionId, CancellationToken ct = default);
+
+    // Direct Wallet Credit (for testing/admin use)
+    Task CreditInstitutionWalletAsync(Guid institutionId, decimal amount, string description, CancellationToken ct = default);
 }
