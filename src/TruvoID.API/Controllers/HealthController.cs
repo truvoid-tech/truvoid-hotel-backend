@@ -18,7 +18,7 @@ public class HealthController : ControllerBase
     }
 
     [HttpGet("")]
-    public IActionResult Root() => Ok(new { status = "ok", service = "TruvoID API", version = "4.1.0", database = "MongoDB" });
+    public IActionResult Root() => Ok(new { status = "ok", service = "TruvoID API", version = "4.2.0", database = "MongoDB" });
 
     [HttpGet("health")]
     public async Task<IActionResult> Health()
