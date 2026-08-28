@@ -20,7 +20,7 @@ public record LoginResponse
 public record UserProfile
 {
     public Guid UserId { get; init; }
-    public Guid InstitutionId { get; init; }
+    public Guid? InstitutionId { get; init; }
     public string Email { get; init; } = string.Empty;
     public string? FullName { get; init; }
     public UserRole Role { get; init; }
@@ -41,7 +41,7 @@ public record RegisterRequest
 
 public record RegisterResponse
 {
-    public Guid InstitutionId { get; init; }
+    public Guid? InstitutionId { get; init; }
     public Guid UserId { get; init; }
     public string AccessToken { get; init; } = string.Empty;
     public string RefreshToken { get; init; } = string.Empty;

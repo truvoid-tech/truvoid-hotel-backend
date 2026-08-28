@@ -16,7 +16,7 @@ public class HealthController : ControllerBase
     }
 
     [HttpGet("")]
-    public IActionResult Root() => Ok(new { status = "ok", service = "TruvoID API", version = "2.4.2" });
+    public IActionResult Root() => Ok(new { status = "ok", service = "TruvoID API", version = "2.5.0" });
 
     [HttpGet("health")]
     public async Task<IActionResult> Health()
@@ -45,44 +45,56 @@ public class HealthController : ControllerBase
             result["error"] = ex.Message;
         }
 
-        result["status"] = result.ContainsKey("user_count") ? "healthy" : "degraded";
+        result["status"] = result.ContainsKey("user_count") && (long)result["user_count"] > 0 ? "healthy" : "degraded";
         return Ok(result);
     }
 
     /// <summary>
-    /// Drop migration history and recreate all tables from the DbContext model.
+    /// Drop all tables and recreate from DbContext model, then seed.
+    /// Use only once to fix schema mismatches.
     /// </summary>
-    [HttpPost("ensure-created")]
-    public async Task<IActionResult> EnsureCreated()
+    [HttpPost("rebuild-schema")]
+    public async Task<IActionResult> RebuildSchema()
     {
         try
         {
             var conn = _db.Database.GetDbConnection();
             await conn.OpenAsync();
 
-            // Drop __EFMigrationsHistory if it exists (it blocks EnsureCreated from creating tables)
+            // Drop all tables in public schema
             using (var cmd = conn.CreateCommand())
             {
-                cmd.CommandText = "DROP TABLE IF EXISTS \"__EFMigrationsHistory\" CASCADE";
+                cmd.CommandText = @"
+                    DO $$ DECLARE
+                        r RECORD;
+                    BEGIN
+                        FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
+                            EXECUTE 'DROP TABLE IF EXISTS ' || quote_ident(r.tablename) || ' CASCADE';
+                        END LOOP;
+                    END $$;";
                 await cmd.ExecuteNonQueryAsync();
             }
 
-            // Now EnsureCreated will create everything fresh
-            var existed = await _db.Database.EnsureCreatedAsync();
+            // Create all tables from DbContext model
+            await _db.Database.EnsureCreatedAsync();
 
             var tables = await ListTablesAsync();
 
+            // Seed
+            await SeedData.SeedAsync(_db);
+
+            var userCount = await _db.Users.CountAsync();
+
             return Ok(new
             {
-                message = tables.Contains("users") ? "All tables created successfully!" : "Tables may not have been created — check logs.",
-                database_existed = existed,
-                tables_found = tables,
-                table_count = tables.Count
+                message = "Schema rebuilt and seeded successfully",
+                tables = tables,
+                user_count = userCount
             });
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { error = ex.Message });
+            return StatusCode(500, new { error = ex.Message, stack = ex.StackTrace });
         }
     }
 

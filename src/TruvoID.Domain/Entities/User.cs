@@ -7,7 +7,7 @@ namespace TruvoID.Domain.Entities;
 /// </summary>
 public class User : BaseEntity
 {
-    public Guid InstitutionId { get; set; }
+    public Guid? InstitutionId { get; set; }
     public string Email { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
     public string? FullName { get; set; }
@@ -24,6 +24,6 @@ public class User : BaseEntity
     public DateTime? PasswordResetTokenExpiry { get; set; }
     
     // Navigation properties
-    public Institution Institution { get; set; } = null!;
+    public Institution? Institution { get; set; }
     public ICollection<VerificationCall> VerificationCalls { get; set; } = new List<VerificationCall>();
 }

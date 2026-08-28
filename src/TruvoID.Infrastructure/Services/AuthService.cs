@@ -26,31 +26,21 @@ public class AuthService : IAuthService
 
     public async Task<RegisterResponse> RegisterAsync(RegisterRequest request, CancellationToken ct = default)
     {
-        // Check for existing institution with same email
-        if (await _db.Institutions.AnyAsync(i => i.ContactEmail == request.ContactEmail, ct))
-            throw new InvalidOperationException("An institution with this email already exists.");
-
-        // Check for existing user with same email
         if (await _db.Users.AnyAsync(u => u.Email == request.AdminEmail, ct))
-            throw new InvalidOperationException("A user with this email already exists.");
+            throw new InvalidOperationException("An account with this email already exists.");
 
-        // Validate password strength
-        ValidatePassword(request.Password);
-
-        // Create institution
         var institution = new Institution
         {
+            Id = Guid.NewGuid(),
             Name = request.InstitutionName,
             ContactEmail = request.ContactEmail,
             ContactPhone = request.ContactPhone,
+            Type = InstitutionType.Other,
             Status = InstitutionStatus.PendingActivation,
-            OnboardingStep = 1
+            CreatedAt = DateTime.UtcNow
         };
-
         _db.Institutions.Add(institution);
-        await _db.SaveChangesAsync(ct);
 
-        // Create admin user
         var adminUser = new User
         {
             InstitutionId = institution.Id,
@@ -60,13 +50,12 @@ public class AuthService : IAuthService
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             Role = UserRole.Admin,
             Status = UserStatus.Active,
-            DailyCallLimit = null // Admin has no limit
+            DailyCallLimit = null
         };
 
         _db.Users.Add(adminUser);
         await _db.SaveChangesAsync(ct);
 
-        // Generate tokens
         var (accessToken, expiresAt) = GenerateAccessToken(adminUser, institution);
         var refreshToken = await GenerateRefreshTokenAsync(adminUser.Id, ct);
 
@@ -92,18 +81,23 @@ public class AuthService : IAuthService
         if (user.Status != UserStatus.Active)
             throw new UnauthorizedAccessException("Account is not active. Please contact your administrator.");
 
-        if (user.Institution.Status == InstitutionStatus.Suspended)
+        if (user.InstitutionId.HasValue && user.Institution?.Status == InstitutionStatus.Suspended)
             throw new UnauthorizedAccessException("Institution account is suspended.");
 
-        // Update last login
         user.LastLoginAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
 
-        // Generate tokens
-        var (accessToken, expiresAt) = GenerateAccessToken(user, user.Institution);
+        var institutionForToken = user.Institution ?? new Institution
+        {
+            Id = Guid.Empty,
+            Name = "TruvoID Platform",
+            Type = InstitutionType.Other,
+            Status = InstitutionStatus.Active
+        };
+
+        var (accessToken, expiresAt) = GenerateAccessToken(user, institutionForToken);
         var refreshToken = await GenerateRefreshTokenAsync(user.Id, ct);
 
-        // Audit log
         await AuditLoginAsync(user.Id, ct);
 
         return new LoginResponse
@@ -118,14 +112,14 @@ public class AuthService : IAuthService
                 Email = user.Email,
                 FullName = user.FullName,
                 Role = user.Role,
-                InstitutionName = user.Institution.Name
+                InstitutionName = user.Institution?.Name ?? "TruvoID Platform"
             }
         };
     }
 
     public async Task<TokenResponse> RefreshTokenAsync(string refreshToken, CancellationToken ct = default)
     {
-        var tokenRecord = await _db.Set<RefreshToken>()
+        var tokenRecord = await _db.RefreshTokens
             .FirstOrDefaultAsync(t => t.Token == refreshToken && !t.IsRevoked, ct);
 
         if (tokenRecord is null)
@@ -134,12 +128,10 @@ public class AuthService : IAuthService
         if (tokenRecord.ExpiresAt < DateTime.UtcNow)
             throw new UnauthorizedAccessException("Refresh token has expired.");
 
-        // Revoke the old refresh token (rotate)
         tokenRecord.IsRevoked = true;
         tokenRecord.RevokedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
 
-        // Get user
         var user = await _db.Users
             .Include(u => u.Institution)
             .FirstOrDefaultAsync(u => u.Id == tokenRecord.UserId, ct);
@@ -147,8 +139,15 @@ public class AuthService : IAuthService
         if (user is null || user.Status != UserStatus.Active)
             throw new UnauthorizedAccessException("User account is not active.");
 
-        // Generate new tokens
-        var (accessToken, expiresAt) = GenerateAccessToken(user, user.Institution);
+        var institutionForToken = user.Institution ?? new Institution
+        {
+            Id = Guid.Empty,
+            Name = "TruvoID Platform",
+            Type = InstitutionType.Other,
+            Status = InstitutionStatus.Active
+        };
+
+        var (accessToken, expiresAt) = GenerateAccessToken(user, institutionForToken);
         var newRefreshToken = await GenerateRefreshTokenAsync(user.Id, ct);
 
         return new TokenResponse
@@ -161,7 +160,7 @@ public class AuthService : IAuthService
 
     public async Task RevokeRefreshTokenAsync(string refreshToken, CancellationToken ct = default)
     {
-        var tokenRecord = await _db.Set<RefreshToken>()
+        var tokenRecord = await _db.RefreshTokens
             .FirstOrDefaultAsync(t => t.Token == refreshToken, ct);
 
         if (tokenRecord is not null)
@@ -175,19 +174,14 @@ public class AuthService : IAuthService
     public async Task ForgotPasswordAsync(string email, CancellationToken ct = default)
     {
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email, ct);
-
-        // Always return success to prevent email enumeration
         if (user is null) return;
 
-        // Generate reset token
         var resetToken = GenerateSecureToken();
         user.PasswordResetToken = resetToken;
-        user.PasswordResetTokenExpiry = DateTime.UtcNow.AddHours(1); // 1 hour expiry
+        user.PasswordResetTokenExpiry = DateTime.UtcNow.AddHours(1);
         await _db.SaveChangesAsync(ct);
 
         // TODO: Send email with reset token via Resend/SendGrid
-        // For now, the token is generated and stored. In production,
-        // this would trigger a transactional email.
     }
 
     public async Task ResetPasswordAsync(ResetPasswordRequest request, CancellationToken ct = default)
@@ -207,8 +201,7 @@ public class AuthService : IAuthService
         user.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync(ct);
 
-        // Revoke all refresh tokens for this user (force re-login)
-        var tokens = await _db.Set<RefreshToken>()
+        var tokens = await _db.RefreshTokens
             .Where(t => t.UserId == user.Id && !t.IsRevoked)
             .ToListAsync(ct);
 
@@ -251,7 +244,7 @@ public class AuthService : IAuthService
             Email = user.Email,
             FullName = user.FullName,
             Role = user.Role,
-            InstitutionName = user.Institution.Name
+            InstitutionName = user.Institution?.Name ?? "TruvoID Platform"
         };
     }
 
@@ -267,76 +260,66 @@ public class AuthService : IAuthService
         var expiryMinutes = int.Parse(jwtSettings["ExpiryMinutes"] ?? "60");
         var expiresAt = DateTime.UtcNow.AddMinutes(expiryMinutes);
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Email, user.Email),
-            new Claim("institution_id", user.InstitutionId.ToString()),
-            new Claim("role", user.Role.ToString()),
-            new Claim("institution_name", institution.Name),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(ClaimTypes.Email, user.Email),
+            new("institution_id", user.InstitutionId?.ToString() ?? Guid.Empty.ToString()),
+            new("role", user.Role.ToString()),
+            new("institution_name", institution.Name),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
         var token = new JwtSecurityToken(
-            issuer: jwtSettings["Issuer"] ?? "TruvoID",
-            audience: jwtSettings["Audience"] ?? "TruvoID",
+            issuer: jwtSettings["Issuer"],
+            audience: jwtSettings["Audience"],
             claims: claims,
             expires: expiresAt,
             signingCredentials: credentials);
 
-        var accessToken = new JwtSecurityTokenHandler().WriteToken(token);
-        return (accessToken, expiresAt);
+        return (new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
     }
 
     private async Task<string> GenerateRefreshTokenAsync(Guid userId, CancellationToken ct)
     {
-        var refreshToken = new RefreshToken
+        var token = new RefreshToken
         {
+            Id = Guid.NewGuid(),
             UserId = userId,
             Token = GenerateSecureToken(),
-            ExpiresAt = DateTime.UtcNow.AddDays(7), // 7-day refresh token
+            ExpiresAt = DateTime.UtcNow.AddDays(7),
             CreatedAt = DateTime.UtcNow
         };
 
-        _db.Set<RefreshToken>().Add(refreshToken);
+        _db.RefreshTokens.Add(token);
         await _db.SaveChangesAsync(ct);
 
-        return refreshToken.Token;
+        return token.Token;
     }
 
     private static string GenerateSecureToken()
     {
-        var randomBytes = new byte[64];
-        using var rng = RandomNumberGenerator.Create();
-        rng.GetBytes(randomBytes);
-        return Convert.ToBase64String(randomBytes).Replace("+", "-").Replace("/", "_").TrimEnd('=');
+        return Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
     }
 
     private static void ValidatePassword(string password)
     {
         if (string.IsNullOrWhiteSpace(password) || password.Length < 8)
             throw new ArgumentException("Password must be at least 8 characters long.");
-        if (!password.Any(char.IsUpper))
-            throw new ArgumentException("Password must contain at least one uppercase letter.");
-        if (!password.Any(char.IsDigit))
-            throw new ArgumentException("Password must contain at least one number.");
-        if (!password.Any(c => !char.IsLetterOrDigit(c)))
-            throw new ArgumentException("Password must contain at least one special character.");
     }
 
     private async Task AuditLoginAsync(Guid userId, CancellationToken ct)
     {
-        var log = new AuditLog
+        _db.AuditLogs.Add(new AuditLog
         {
+            Id = Guid.NewGuid(),
             ActorId = userId,
             ActorType = "User",
             Action = AuditAction.Login,
-            Entity = nameof(User),
-            EntityId = userId
-        };
-
-        _db.AuditLogs.Add(log);
+            Entity = "User",
+            EntityId = userId,
+            CreatedAt = DateTime.UtcNow
+        });
         await _db.SaveChangesAsync(ct);
     }
 }
-
