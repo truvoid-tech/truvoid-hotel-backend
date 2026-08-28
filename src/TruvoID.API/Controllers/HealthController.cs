@@ -86,6 +86,21 @@ public class HealthController : ControllerBase
         }
     }
 
+    [HttpPost("seed-admin")]
+    public async Task<IActionResult> SeedAdmin()
+    {
+        try
+        {
+            await SeedData.SeedAsync(_db);
+            var userCount = await _db.Users.CountAsync();
+            return Ok(new { message = "Seed completed", user_count = userCount });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { error = ex.Message, stack = ex.StackTrace });
+        }
+    }
+
     private async Task<List<string>> ListTablesAsync()
     {
         var conn = _db.Database.GetDbConnection();
