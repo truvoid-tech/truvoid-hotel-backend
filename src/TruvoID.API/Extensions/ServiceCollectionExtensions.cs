@@ -55,6 +55,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IOnboardingService, OnboardingService>();
         services.AddScoped<IAdminService, AdminService>();
+        services.AddScoped<INimcConfigService, NimcConfigService>();
 
         return services;
     }

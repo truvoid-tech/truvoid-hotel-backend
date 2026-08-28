@@ -6,17 +6,12 @@ using TruvoID.Domain.Entities;
 
 namespace TruvoID.Infrastructure.Data;
 
-/// <summary>
-/// MongoDB context replacing TruvoIDDbContext. Provides typed collection accessors.
-/// No migrations needed — collections are created automatically on first insert.
-/// </summary>
 public class MongoDbContext
 {
     private readonly IMongoDatabase _database;
 
     static MongoDbContext()
     {
-        // Register Guid serializer with Standard (UUID) representation for MongoDB Driver v3
         BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard));
     }
 
@@ -33,10 +28,8 @@ public class MongoDbContext
     public IMongoCollection<AuditLog> AuditLogs => _database.GetCollection<AuditLog>("audit_logs");
     public IMongoCollection<PricingRate> PricingRates => _database.GetCollection<PricingRate>("pricing_rates");
     public IMongoCollection<RefreshToken> RefreshTokens => _database.GetCollection<RefreshToken>("refresh_tokens");
+    public IMongoCollection<NimcConfig> NimcConfigs => _database.GetCollection<NimcConfig>("nimc_configs");
 
-    /// <summary>
-    /// Ensure indexes exist for performance. Called once on startup.
-    /// </summary>
     public async Task EnsureIndexesAsync()
     {
         await Users.Indexes.CreateOneAsync(new CreateIndexModel<User>(
@@ -92,5 +85,9 @@ public class MongoDbContext
         await RefreshTokens.Indexes.CreateOneAsync(new CreateIndexModel<RefreshToken>(
             Builders<RefreshToken>.IndexKeys.Ascending(t => t.UserId),
             new CreateIndexOptions { Name = "ix_refresh_user" }));
+
+        await NimcConfigs.Indexes.CreateOneAsync(new CreateIndexModel<NimcConfig>(
+            Builders<NimcConfig>.IndexKeys.Ascending(c => c.Environment),
+            new CreateIndexOptions { Unique = true, Name = "ix_nimc_env" }));
     }
 }
