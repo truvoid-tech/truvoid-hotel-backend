@@ -1,0 +1,10 @@
+.git
+.idea
+bin
+obj
+node_modules
+Components
+wwwroot
+*.md
+railway.toml
+appsettings.Development.json

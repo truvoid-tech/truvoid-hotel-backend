@@ -1,10 +1,4 @@
 [build]
-builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile"
-
+buildCommand = "dotnet publish src/TruvoID.API/TruvoID.API.csproj -c Release -o out"
 [deploy]
-startCommand = ""
-healthcheckPath = "/v1/auth/login"
-healthcheckTimeout = 300
-restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 3
+startCommand = "dotnet out/TruvoID.API.dll"
