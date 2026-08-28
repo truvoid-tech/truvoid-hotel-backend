@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using MongoDB.Driver;
 using TruvoID.Core.DTOs;
 using TruvoID.Core.Interfaces;
