@@ -18,36 +18,19 @@ public class NimcConfigController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetAll(CancellationToken ct)
+    public async Task<IActionResult> Get(CancellationToken ct)
     {
-        var configs = await _nimcConfigService.GetAllAsync(ct);
-        return Ok(configs);
+        var config = await _nimcConfigService.GetActiveEnvironmentAsync(ct);
+        return Ok(config);
     }
 
-    [HttpGet("active")]
-    public async Task<IActionResult> GetActive(CancellationToken ct)
+    [HttpPut]
+    public async Task<IActionResult> Set([FromBody] SetNimcEnvironmentRequest request, CancellationToken ct)
     {
-        var config = await _nimcConfigService.GetActiveAsync(ct);
-        return config is null ? NotFound(new { message = "No active NIMC configuration found." }) : Ok(config);
-    }
-
-    [HttpPut("{environment}")]
-    public async Task<IActionResult> Upsert(string environment, [FromBody] UpdateNimcConfigRequest request, CancellationToken ct)
-    {
-        if (environment != "live" && environment != "sandbox")
+        if (request.Environment != "live" && request.Environment != "sandbox")
             return BadRequest(new { message = "Environment must be 'live' or 'sandbox'." });
 
-        await _nimcConfigService.UpsertAsync(environment, request, ct);
-        return Ok(new { message = $"NIMC {environment} configuration saved." });
-    }
-
-    [HttpPost("{environment}/activate")]
-    public async Task<IActionResult> Activate(string environment, CancellationToken ct)
-    {
-        if (environment != "live" && environment != "sandbox")
-            return BadRequest(new { message = "Environment must be 'live' or 'sandbox'." });
-
-        await _nimcConfigService.ActivateAsync(environment, ct);
-        return Ok(new { message = $"NIMC {environment} environment activated." });
+        await _nimcConfigService.SetActiveEnvironmentAsync(request.Environment, ct);
+        return Ok(new { message = $"NIMC environment set to {request.Environment}.", activeEnvironment = request.Environment });
     }
 }

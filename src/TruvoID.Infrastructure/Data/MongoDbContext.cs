@@ -87,7 +87,7 @@ public class MongoDbContext
             new CreateIndexOptions { Name = "ix_refresh_user" }));
 
         await NimcConfigs.Indexes.CreateOneAsync(new CreateIndexModel<NimcConfig>(
-            Builders<NimcConfig>.IndexKeys.Ascending(c => c.Environment),
+            Builders<NimcConfig>.IndexKeys.Ascending(c => c.ActiveEnvironment),
             new CreateIndexOptions { Unique = true, Name = "ix_nimc_env" }));
     }
 }
