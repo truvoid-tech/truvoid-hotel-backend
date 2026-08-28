@@ -8,12 +8,21 @@ using TruvoID.Infrastructure.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Railway binds to the PORT env var
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+builder.WebHost.UseUrls($"http://+:{port}");
+
 // Add services
 builder.Services.AddTruvoIDServices(builder.Configuration);
 
 // JWT Authentication
 var jwtSection = builder.Configuration.GetSection("Jwt");
-var secretKey = jwtSection["SecretKey"] ?? throw new InvalidOperationException("JWT SecretKey not configured.");
+var secretKey = jwtSection["SecretKey"];
+if (string.IsNullOrWhiteSpace(secretKey))
+{
+    Console.WriteLine("[FATAL] Jwt__SecretKey environment variable is not set. The API cannot start.");
+    throw new InvalidOperationException("JWT SecretKey not configured. Set the Jwt__SecretKey environment variable.");
+}
 var key = Encoding.UTF8.GetBytes(secretKey);
 
 builder.Services.AddAuthentication(options =>
@@ -56,11 +65,18 @@ builder.Services.AddEndpointsApiExplorer();
 var app = builder.Build();
 
 // ─── Seed database on startup ───
-using (var scope = app.Services.CreateScope())
+try
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<TruvoIDDbContext>();
     await db.Database.MigrateAsync();
     await SeedData.SeedAsync(db);
+    Console.WriteLine("[Startup] Database migrated and seeded successfully.");
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"[Startup] Database migration/seed failed: {ex.Message}");
+    Console.WriteLine("[Startup] The API will start anyway — database operations will fail until the DB is accessible.");
 }
 
 // Middleware pipeline
@@ -83,5 +99,7 @@ app.UseWhen(
     appBuilder => appBuilder.UseMiddleware<ApiKeyAuthenticationMiddleware>());
 
 app.MapControllers();
+
+Console.WriteLine($"[Startup] TruvoID API listening on port {port}");
 
 app.Run();
