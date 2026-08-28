@@ -22,7 +22,7 @@ public class VerificationService : IVerificationService
     private readonly IAuditService _auditService;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IConfiguration _configuration;
-    private const string IdaccessBaseUrl = "https://api.idaccess.info/v1";
+    private const string IdaccessBaseUrl = "https://idaccess.info/v1";
 
     public VerificationService(
         MongoDbContext db,
