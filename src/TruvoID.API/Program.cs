@@ -104,7 +104,7 @@ try
     using (var checkCmd = conn.CreateCommand())
     {
         checkCmd.CommandText = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'users'";
-        var count = (long)(await checkCmd.ExecuteScalarAsync() ?? 0);
+        var count = Convert.ToInt64(await checkCmd.ExecuteScalarAsync() ?? 0);
 
         if (count == 0)
         {
