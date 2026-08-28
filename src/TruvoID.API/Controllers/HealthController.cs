@@ -30,19 +30,27 @@ public class HealthController : ControllerBase
 
             if (canConnect)
             {
-                var userCount = await _db.Users.CountAsync();
-                result["users_table"] = "exists";
-                result["user_count"] = userCount;
+                // List actual PostgreSQL tables using raw SQL
+                var conn = _db.Database.GetDbConnection();
+                await conn.OpenAsync();
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "SELECT tablename FROM pg_tables WHERE schemaname = 'public'";
+                using var reader = await cmd.ExecuteReaderAsync();
+                var tables = new List<string>();
+                while (await reader.ReadAsync())
+                    tables.Add(reader.GetString(0));
+                result["tables"] = tables;
 
-                var instCount = await _db.Institutions.CountAsync();
-                result["institutions_table"] = "exists";
-                result["institution_count"] = instCount;
+                if (tables.Contains("users"))
+                {
+                    var userCount = await _db.Users.CountAsync();
+                    result["user_count"] = userCount;
+                }
             }
         }
         catch (Exception ex)
         {
-            result["database_connected"] = true; // Connection works but tables missing
-            result["database_error"] = ex.Message;
+            result["error"] = ex.Message;
         }
 
         result["status"] = result.ContainsKey("user_count") ? "healthy" : "degraded";
@@ -51,7 +59,6 @@ public class HealthController : ControllerBase
 
     /// <summary>
     /// Force-create database tables from the DbContext model.
-    /// Use this once to bootstrap the schema, then remove.
     /// </summary>
     [HttpPost("ensure-created")]
     public async Task<IActionResult> EnsureCreated()
@@ -59,15 +66,27 @@ public class HealthController : ControllerBase
         try
         {
             var existed = await _db.Database.EnsureCreatedAsync();
+
+            // Now verify tables were actually created
+            var conn = _db.Database.GetDbConnection();
+            await conn.OpenAsync();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT tablename FROM pg_tables WHERE schemaname = 'public'";
+            using var reader = await cmd.ExecuteReaderAsync();
+            var tables = new List<string>();
+            while (await reader.ReadAsync())
+                tables.Add(reader.GetString(0));
+
             return Ok(new
             {
-                message = existed ? "Database already existed — tables verified." : "Database created successfully.",
-                tables_created = !existed
+                database_existed = existed,
+                tables_found = tables,
+                table_count = tables.Count
             });
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { error = ex.Message, stackTrace = ex.StackTrace });
+            return StatusCode(500, new { error = ex.Message, stackTrace = ex.StackTrace?.Substring(0, Math.Min(500, ex.StackTrace?.Length ?? 0)) });
         }
     }
 }
