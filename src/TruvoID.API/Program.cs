@@ -64,14 +64,25 @@ builder.Services.AddEndpointsApiExplorer();
 
 var app = builder.Build();
 
-// Middleware pipeline
-if (!app.Environment.IsDevelopment())
+// Global exception handler — log errors instead of swallowing them
+app.UseExceptionHandler(errorApp =>
 {
-    app.UseExceptionHandler("/Error");
-}
+    errorApp.Run(async context =>
+    {
+        var exception = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
+        Console.WriteLine($"[ERROR] {exception?.Message}");
+        Console.WriteLine($"[ERROR] {exception?.StackTrace}");
 
-// NOTE: Do NOT use UseHttpsRedirection() — Railway terminates TLS at the edge
-// and forwards plain HTTP to the container. HTTPS redirect causes an infinite loop.
+        context.Response.StatusCode = 500;
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsJsonAsync(new
+        {
+            status = "error",
+            code = 500,
+            message = exception?.Message ?? "An unexpected error occurred."
+        });
+    });
+});
 
 app.UseCors();
 
@@ -97,7 +108,8 @@ try
 }
 catch (Exception ex)
 {
-    Console.WriteLine($"[Startup] Database migration/seed failed: {ex.Message}");
+    Console.WriteLine($"[Startup] Database migration/seed FAILED: {ex.Message}");
+    Console.WriteLine($"[Startup] Stack trace: {ex.StackTrace}");
     Console.WriteLine("[Startup] The API will start anyway — database operations will fail until the DB is accessible.");
 }
 
