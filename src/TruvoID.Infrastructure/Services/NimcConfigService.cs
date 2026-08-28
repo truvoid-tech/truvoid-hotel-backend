@@ -44,5 +44,5 @@ public class NimcConfigService : INimcConfigService
     }
 
     public string GetApiBaseUrl() => "https://api.idaccess.info/v1";
-    public string GetApiKey() => _config["NIMC_API_KEY"] ?? "";
+    public string GetApiKey() => _config["IDACCESS_API_KEY"] ?? "";
 }
