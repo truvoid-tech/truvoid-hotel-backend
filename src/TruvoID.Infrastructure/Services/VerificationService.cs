@@ -139,8 +139,6 @@ public class VerificationService : IVerificationService
             var upstreamIdempotencyKey = idempotencyKey ?? $"req_{call.Id:N}";
             client.DefaultRequestHeaders.Remove("Idempotency-Key");
             client.DefaultRequestHeaders.Add("Idempotency-Key", upstreamIdempotencyKey);
-            client.DefaultRequestHeaders.Remove("X-Request-Reason");
-            client.DefaultRequestHeaders.Add("X-Request-Reason", "KYC");
 
             // Determine endpoint and body field per IDaccess docs
             string endpoint = type switch
