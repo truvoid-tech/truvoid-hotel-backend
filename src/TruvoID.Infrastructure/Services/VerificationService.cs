@@ -126,7 +126,7 @@ public class VerificationService : IVerificationService
         // 7. Call IDaccess partner API
         try
         {
-            var apiKey = _configuration["IDACCESS_API_KEY"];
+            var apiKey = _configuration["IDACCESS_API_KEY"] ?? _configuration["IDACCESS-API-KEY"];
             if (string.IsNullOrEmpty(apiKey))
             {
                 throw new InvalidOperationException("IDACCESS_API_KEY not configured.");
