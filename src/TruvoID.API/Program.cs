@@ -1,8 +1,10 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using TruvoID.API.Extensions;
 using TruvoID.API.Middleware;
+using TruvoID.Infrastructure.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -52,6 +54,14 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
 var app = builder.Build();
+
+// ─── Seed database on startup ───
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<TruvoIDDbContext>();
+    await db.Database.MigrateAsync();
+    await SeedData.SeedAsync(db);
+}
 
 // Middleware pipeline
 if (!app.Environment.IsDevelopment())

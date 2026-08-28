@@ -8,18 +8,40 @@ public static class SeedData
 {
     public static async Task SeedAsync(TruvoIDDbContext db)
     {
-        // Only seed if the database is empty
+        // ─── PlatformAdmin user ───
+        // Only seed if no PlatformAdmin exists
+        if (!await db.Users.AnyAsync(u => u.Role == UserRole.PlatformAdmin))
+        {
+            var adminUser = new User
+            {
+                Id = Guid.NewGuid(),
+                Email = "admin@truvoid.ng",
+                FullName = "TruvoID Platform Admin",
+                PhoneNumber = "+2348000000000",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@12345"),
+                Role = UserRole.PlatformAdmin,
+                Status = UserStatus.Active,
+                DailyCallLimit = null,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            db.Users.Add(adminUser);
+            await db.SaveChangesAsync();
+
+            Console.WriteLine("[Seed] PlatformAdmin created: admin@truvoid.ng / Admin@12345");
+        }
+
+        // ─── Default pricing rates ───
         if (await db.PricingRates.AnyAsync())
             return;
 
-        // Default pricing rates (NGN) — configurable via admin panel later
         var defaultRates = new List<PricingRate>
         {
             new()
             {
                 Type = VerificationType.Nin,
                 PricePerCall = 100.00m,
-                NimcPartnerCost = 70.00m,
+                NimcPartnerCost = 45.00m,
                 IsActive = true,
                 EffectiveFrom = DateTime.UtcNow
             },
@@ -27,7 +49,7 @@ public static class SeedData
             {
                 Type = VerificationType.Bvn,
                 PricePerCall = 150.00m,
-                NimcPartnerCost = 100.00m,
+                NimcPartnerCost = 65.00m,
                 IsActive = true,
                 EffectiveFrom = DateTime.UtcNow
             },
@@ -35,7 +57,7 @@ public static class SeedData
             {
                 Type = VerificationType.Phone,
                 PricePerCall = 50.00m,
-                NimcPartnerCost = 30.00m,
+                NimcPartnerCost = 20.00m,
                 IsActive = true,
                 EffectiveFrom = DateTime.UtcNow
             }
@@ -43,5 +65,7 @@ public static class SeedData
 
         db.PricingRates.AddRange(defaultRates);
         await db.SaveChangesAsync();
+
+        Console.WriteLine("[Seed] Default pricing rates created.");
     }
 }
