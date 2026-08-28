@@ -1,3 +1,6 @@
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Serializers;
 using MongoDB.Driver;
 using TruvoID.Domain.Entities;
 
@@ -10,6 +13,12 @@ namespace TruvoID.Infrastructure.Data;
 public class MongoDbContext
 {
     private readonly IMongoDatabase _database;
+
+    static MongoDbContext()
+    {
+        // Register Guid serializer with Standard (UUID) representation for MongoDB Driver v3
+        BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard));
+    }
 
     public MongoDbContext(IMongoClient client, string databaseName)
     {
@@ -30,7 +39,6 @@ public class MongoDbContext
     /// </summary>
     public async Task EnsureIndexesAsync()
     {
-        // Users — unique email
         await Users.Indexes.CreateOneAsync(new CreateIndexModel<User>(
             Builders<User>.IndexKeys.Ascending(u => u.Email),
             new CreateIndexOptions { Unique = true, Name = "ix_users_email" }));
@@ -39,12 +47,10 @@ public class MongoDbContext
             Builders<User>.IndexKeys.Ascending(u => u.InstitutionId),
             new CreateIndexOptions { Name = "ix_users_institution" }));
 
-        // Institutions — unique name
         await Institutions.Indexes.CreateOneAsync(new CreateIndexModel<Institution>(
             Builders<Institution>.IndexKeys.Ascending(i => i.Name),
             new CreateIndexOptions { Unique = true, Name = "ix_institutions_name" }));
 
-        // API Keys — unique hash, lookup by institution
         await ApiKeys.Indexes.CreateOneAsync(new CreateIndexModel<ApiKey>(
             Builders<ApiKey>.IndexKeys.Ascending(k => k.KeyHash),
             new CreateIndexOptions { Unique = true, Name = "ix_apikeys_hash" }));
@@ -53,14 +59,12 @@ public class MongoDbContext
             Builders<ApiKey>.IndexKeys.Ascending(k => k.InstitutionId),
             new CreateIndexOptions { Name = "ix_apikeys_institution" }));
 
-        // Wallet Ledger — lookup by institution + created_at
         await WalletLedgerEntries.Indexes.CreateOneAsync(new CreateIndexModel<WalletLedgerEntry>(
             Builders<WalletLedgerEntry>.IndexKeys
                 .Ascending(w => w.InstitutionId)
                 .Descending(w => w.CreatedAt),
             new CreateIndexOptions { Name = "ix_wallet_inst_created" }));
 
-        // Verification Calls — lookup by institution, idempotency key, created_at
         await VerificationCalls.Indexes.CreateOneAsync(new CreateIndexModel<VerificationCall>(
             Builders<VerificationCall>.IndexKeys
                 .Ascending(v => v.InstitutionId)
@@ -71,19 +75,16 @@ public class MongoDbContext
             Builders<VerificationCall>.IndexKeys.Ascending(v => v.IdempotencyKey),
             new CreateIndexOptions { Sparse = true, Unique = true, Name = "ix_calls_idempotency" }));
 
-        // Pricing Rates — lookup by type + institution
         await PricingRates.Indexes.CreateOneAsync(new CreateIndexModel<PricingRate>(
             Builders<PricingRate>.IndexKeys
                 .Ascending(r => r.Type)
                 .Ascending(r => r.InstitutionId),
             new CreateIndexOptions { Name = "ix_pricing_type_inst" }));
 
-        // Audit Logs — lookup by actor, entity, created_at
         await AuditLogs.Indexes.CreateOneAsync(new CreateIndexModel<AuditLog>(
             Builders<AuditLog>.IndexKeys.Ascending(a => a.ActorId),
             new CreateIndexOptions { Name = "ix_audit_actor" }));
 
-        // Refresh Tokens — lookup by token, user
         await RefreshTokens.Indexes.CreateOneAsync(new CreateIndexModel<RefreshToken>(
             Builders<RefreshToken>.IndexKeys.Ascending(t => t.Token),
             new CreateIndexOptions { Unique = true, Name = "ix_refresh_token" }));
