@@ -64,6 +64,28 @@ builder.Services.AddEndpointsApiExplorer();
 
 var app = builder.Build();
 
+// Middleware pipeline
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Error");
+}
+
+// NOTE: Do NOT use UseHttpsRedirection() — Railway terminates TLS at the edge
+// and forwards plain HTTP to the container. HTTPS redirect causes an infinite loop.
+
+app.UseCors();
+
+// JWT authentication — must come before authorization
+app.UseAuthentication();
+app.UseAuthorization();
+
+// API key authentication (applies to /v1/* endpoints for API gateway consumers)
+app.UseWhen(
+    context => context.Request.Path.StartsWithSegments("/v1"),
+    appBuilder => appBuilder.UseMiddleware<ApiKeyAuthenticationMiddleware>());
+
+app.MapControllers();
+
 // ─── Seed database on startup ───
 try
 {
@@ -78,27 +100,6 @@ catch (Exception ex)
     Console.WriteLine($"[Startup] Database migration/seed failed: {ex.Message}");
     Console.WriteLine("[Startup] The API will start anyway — database operations will fail until the DB is accessible.");
 }
-
-// Middleware pipeline
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Error");
-    app.UseHsts();
-}
-
-app.UseHttpsRedirection();
-app.UseCors();
-
-// JWT authentication — must come before authorization
-app.UseAuthentication();
-app.UseAuthorization();
-
-// API key authentication (applies to /v1/* endpoints for API gateway consumers)
-app.UseWhen(
-    context => context.Request.Path.StartsWithSegments("/v1"),
-    appBuilder => appBuilder.UseMiddleware<ApiKeyAuthenticationMiddleware>());
-
-app.MapControllers();
 
 Console.WriteLine($"[Startup] TruvoID API listening on port {port}");
 
