@@ -3,7 +3,6 @@ using TruvoID.Domain.Enums;
 using MongoDB.Driver;
 using TruvoID.Core.DTOs;
 using TruvoID.Core.Interfaces;
-using TruvoID.Domain.Enums;
 using TruvoID.Infrastructure.Data;
 
 namespace TruvoID.Infrastructure.Services;
@@ -11,8 +10,13 @@ namespace TruvoID.Infrastructure.Services;
 public class AdminService : IAdminService
 {
     private readonly MongoDbContext _db;
+    private readonly INotificationService _notifications;
 
-    public AdminService(MongoDbContext db) => _db = db;
+    public AdminService(MongoDbContext db, INotificationService notifications)
+    {
+        _db = db;
+        _notifications = notifications;
+    }
 
     public async Task<AdminOverviewDto> GetOverviewAsync(CancellationToken ct = default)
     {
@@ -193,12 +197,25 @@ public class AdminService : IAdminService
 
     public async Task ApproveInstitutionAsync(Guid institutionId, CancellationToken ct = default)
     {
+        var institution = await _db.Institutions.Find(i => i.Id == institutionId).FirstOrDefaultAsync(ct)
+            ?? throw new KeyNotFoundException("Institution not found.");
+
         var update = Builders<Domain.Entities.Institution>.Update
             .Set(i => i.Status, InstitutionStatus.Active)
             .Set(i => i.OnboardingCompleted, true)
             .Set(i => i.UpdatedAt, DateTime.UtcNow);
-        var result = await _db.Institutions.UpdateOneAsync(i => i.Id == institutionId, update, cancellationToken: ct);
-        if (result.MatchedCount == 0) throw new KeyNotFoundException("Institution not found.");
+        await _db.Institutions.UpdateOneAsync(i => i.Id == institutionId, update, cancellationToken: ct);
+
+        var adminUser = await _db.Users
+            .Find(u => u.InstitutionId == institutionId && u.Role == Domain.Enums.UserRole.Admin)
+            .FirstOrDefaultAsync(ct);
+
+        var recipientEmail = adminUser?.Email ?? institution.ContactEmail;
+        var recipientName = adminUser?.FullName ?? institution.Name;
+
+        if (!string.IsNullOrWhiteSpace(recipientEmail))
+            _ = Task.Run(async () =>
+                await _notifications.SendApprovalAsync(recipientEmail, recipientName ?? string.Empty, institution.Name));
     }
 
     public async Task<AdminFinancialsDto> GetFinancialsAsync(string period = "mtd", CancellationToken ct = default)

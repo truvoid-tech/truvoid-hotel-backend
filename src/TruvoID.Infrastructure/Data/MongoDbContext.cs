@@ -29,6 +29,7 @@ public class MongoDbContext
     public IMongoCollection<PricingRate> PricingRates => _database.GetCollection<PricingRate>("pricing_rates");
     public IMongoCollection<RefreshToken> RefreshTokens => _database.GetCollection<RefreshToken>("refresh_tokens");
     public IMongoCollection<NimcConfig> NimcConfigs => _database.GetCollection<NimcConfig>("nimc_configs");
+    public IMongoCollection<NotificationPreference> NotificationPreferences => _database.GetCollection<NotificationPreference>("notification_preferences");
 
     public async Task EnsureIndexesAsync()
     {
@@ -90,5 +91,9 @@ public class MongoDbContext
         await NimcConfigs.Indexes.CreateOneAsync(new CreateIndexModel<NimcConfig>(
             Builders<NimcConfig>.IndexKeys.Ascending(c => c.ActiveEnvironment),
             new CreateIndexOptions { Unique = true, Name = "ix_nimc_env" }));
+
+        await NotificationPreferences.Indexes.CreateOneAsync(new CreateIndexModel<NotificationPreference>(
+            Builders<NotificationPreference>.IndexKeys.Ascending(p => p.InstitutionId),
+            new CreateIndexOptions { Unique = true, Name = "ix_notif_prefs_institution" }));
     }
 }

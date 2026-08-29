@@ -52,6 +52,22 @@ public static class ServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(30);
         });
 
+        // HTTP Client for Resend email API
+        var resendApiKey = configuration["RESEND_API_KEY"]
+            ?? Environment.GetEnvironmentVariable("RESEND_API_KEY")
+            ?? string.Empty;
+        services.AddHttpClient("resend", client =>
+        {
+            client.BaseAddress = new Uri("https://api.resend.com/");
+            if (!string.IsNullOrWhiteSpace(resendApiKey))
+                client.DefaultRequestHeaders.Add("Authorization", $"Bearer {resendApiKey}");
+        });
+
+        // Email + notification services
+        services.AddScoped<IEmailService, ResendEmailService>();
+        services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<NotificationPreferenceService>();
+
         // Business services
         services.AddScoped<IWalletService, WalletService>();
         services.AddScoped<IVerificationService, VerificationService>();

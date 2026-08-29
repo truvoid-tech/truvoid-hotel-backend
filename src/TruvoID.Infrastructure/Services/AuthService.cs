@@ -17,11 +17,13 @@ public class AuthService : IAuthService
 {
     private readonly MongoDbContext _db;
     private readonly IConfiguration _configuration;
+    private readonly INotificationService _notifications;
 
-    public AuthService(MongoDbContext db, IConfiguration configuration)
+    public AuthService(MongoDbContext db, IConfiguration configuration, INotificationService notifications)
     {
         _db = db;
         _configuration = configuration;
+        _notifications = notifications;
     }
 
     public async Task<RegisterResponse> RegisterAsync(RegisterRequest request, CancellationToken ct = default)
@@ -54,6 +56,9 @@ public class AuthService : IAuthService
 
         var (accessToken, expiresAt) = GenerateAccessToken(adminUser, institution);
         var refreshToken = await GenerateRefreshTokenAsync(adminUser.Id, ct);
+
+        _ = Task.Run(async () =>
+            await _notifications.SendWelcomeAsync(adminUser.Email, adminUser.FullName ?? "Admin", institution.Name));
 
         return new RegisterResponse
         {
@@ -181,6 +186,12 @@ public class AuthService : IAuthService
             .Set(u => u.PasswordResetToken, resetToken)
             .Set(u => u.PasswordResetTokenExpiry, DateTime.UtcNow.AddHours(1));
         await _db.Users.UpdateOneAsync(u => u.Id == user.Id, update, cancellationToken: ct);
+
+        var baseUrl = _configuration["APP_BASE_URL"]
+            ?? Environment.GetEnvironmentVariable("APP_BASE_URL")
+            ?? "https://app.truvoid.com";
+        _ = Task.Run(async () =>
+            await _notifications.SendPasswordResetAsync(user.Email, user.FullName ?? "Admin", resetToken, baseUrl));
     }
 
     public async Task ResetPasswordAsync(ResetPasswordRequest request, CancellationToken ct = default)
