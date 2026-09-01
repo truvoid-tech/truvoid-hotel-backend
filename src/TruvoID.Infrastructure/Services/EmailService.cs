@@ -11,7 +11,7 @@ public interface IEmailService
 public class ResendEmailService : IEmailService
 {
     private readonly HttpClient _http;
-    private const string FromAddress = "TruvoID <noreply@truvoid.com>";
+    private const string FromAddress = "TruvoID <noreply@gettruvoid.com>";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

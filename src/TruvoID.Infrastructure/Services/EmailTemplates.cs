@@ -43,7 +43,7 @@ public static class EmailTemplates
         <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:16px 20px;margin:0 0 24px;">
           <p style="margin:0;color:#92400e;font-size:14px;"><strong>What happens next:</strong> Document review typically takes 1&ndash;2 business days. You'll receive an email when your account is approved and ready for live verifications.</p>
         </div>
-        <p style="margin:0;color:#6b7280;font-size:14px;">Questions? Contact us at <a href="mailto:support@truvoid.com" style="color:#1f3864;">support@truvoid.com</a></p>
+        <p style="margin:0;color:#6b7280;font-size:14px;">Questions? Contact us at <a href="mailto:support@gettruvoid.com" style="color:#1f3864;">support@gettruvoid.com</a></p>
         """);
 
     public static string Approved(string institutionName, string adminName) => Wrap("Account Approved — TruvoID", $"""
@@ -54,7 +54,7 @@ public static class EmailTemplates
         <p style="margin:0 0 24px;color:#6b7280;font-size:15px;line-height:1.6;text-align:center;"><strong style="color:#1f3864;">{institutionName}</strong> has been verified and activated. You now have full access to TruvoID's identity verification infrastructure.</p>
         <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
           <tr><td align="center">
-            <a href="https://app.truvoid.com/dashboard" style="display:inline-block;background:#1f3864;color:#fafafa;text-decoration:none;font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:1px;padding:14px 32px;border-radius:6px;">Go to Dashboard</a>
+            <a href="https://gettruvoid.com/dashboard" style="display:inline-block;background:#1f3864;color:#fafafa;text-decoration:none;font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:1px;padding:14px 32px;border-radius:6px;">Go to Dashboard</a>
           </td></tr>
         </table>
         <p style="margin:0;color:#6b7280;font-size:13px;text-align:center;">Log in with your registered admin credentials to begin running verifications.</p>
@@ -82,7 +82,7 @@ public static class EmailTemplates
         </table>
         <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 16px;">
           <tr><td align="center">
-            <a href="https://app.truvoid.com/wallet/topup" style="display:inline-block;background:#f5a623;color:#fafafa;text-decoration:none;font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:1px;padding:14px 32px;border-radius:6px;">Top Up Wallet</a>
+            <a href="https://gettruvoid.com/wallet/topup" style="display:inline-block;background:#f5a623;color:#fafafa;text-decoration:none;font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:1px;padding:14px 32px;border-radius:6px;">Top Up Wallet</a>
           </td></tr>
         </table>
         <p style="margin:0;color:#9ca3af;font-size:12px;text-align:center;">Verification operations will continue until your balance reaches zero. Fund your wallet to avoid interruption.</p>
@@ -109,7 +109,7 @@ public static class EmailTemplates
             <span style="color:#1f3864;font-size:16px;font-weight:600;">&#8358;{cost:N2}</span>
           </td></tr>
         </table>
-        <p style="margin:0;color:#9ca3af;font-size:12px;">View full details in your <a href="https://app.truvoid.com/history" style="color:#1f3864;">verification history</a>.</p>
+        <p style="margin:0;color:#9ca3af;font-size:12px;">View full details in your <a href="https://gettruvoid.com/history" style="color:#1f3864;">verification history</a>.</p>
         """);
 
     public static string StaffInvitation(string institutionName, string inviterName, string role, string inviteUrl) => Wrap($"You've been invited to join {institutionName} on TruvoID", $"""

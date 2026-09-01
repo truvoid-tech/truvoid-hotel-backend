@@ -189,7 +189,7 @@ public class AuthService : IAuthService
 
         var baseUrl = _configuration["APP_BASE_URL"]
             ?? Environment.GetEnvironmentVariable("APP_BASE_URL")
-            ?? "https://app.truvoid.com";
+            ?? "https://gettruvoid.com";
         _ = Task.Run(async () =>
             await _notifications.SendPasswordResetAsync(user.Email, user.FullName ?? "Admin", resetToken, baseUrl));
     }
