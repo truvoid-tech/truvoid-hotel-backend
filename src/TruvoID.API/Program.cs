@@ -126,9 +126,9 @@ try
         Console.WriteLine("[Startup] Seeding default pricing rates...");
         var defaultRates = new List<PricingRate>
         {
-            new() { Type = VerificationType.Nin, PricePerCall = 100.00m, NimcPartnerCost = 45.00m, IsActive = true, EffectiveFrom = DateTime.UtcNow },
-            new() { Type = VerificationType.Bvn, PricePerCall = 150.00m, NimcPartnerCost = 65.00m, IsActive = true, EffectiveFrom = DateTime.UtcNow },
-            new() { Type = VerificationType.Phone, PricePerCall = 50.00m, NimcPartnerCost = 20.00m, IsActive = true, EffectiveFrom = DateTime.UtcNow }
+            new() { Type = VerificationType.Nin, PricePerCall = 300.00m, NimcPartnerCost = 45.00m, IsActive = true, EffectiveFrom = DateTime.UtcNow },
+            new() { Type = VerificationType.Bvn, PricePerCall = 300.00m, NimcPartnerCost = 65.00m, IsActive = true, EffectiveFrom = DateTime.UtcNow },
+            new() { Type = VerificationType.Phone, PricePerCall = 300.00m, NimcPartnerCost = 20.00m, IsActive = true, EffectiveFrom = DateTime.UtcNow }
         };
         await mongoDbContext.PricingRates.InsertManyAsync(defaultRates);
         Console.WriteLine("[Seed] Default pricing rates created.");
