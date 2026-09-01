@@ -585,7 +585,8 @@ public class AdminService : IAdminService
             .SortByDescending(e => e.CreatedAt)
             .FirstOrDefaultAsync(ct);
         var currentBalance = latestEntry?.BalanceAfter ?? 0m;
-        var newBalance = currentBalance + amount;
+        var currentTokens = latestEntry?.TokensAfter ?? 0m;
+        var tokens = amount / TokenPricing.NairaPerToken;
 
         await _db.WalletLedgerEntries.InsertOneAsync(new WalletLedgerEntry
         {
@@ -593,7 +594,9 @@ public class AdminService : IAdminService
             InstitutionId = institutionId,
             Type = WalletTransactionType.Credit,
             Amount = amount,
-            BalanceAfter = newBalance,
+            BalanceAfter = currentBalance + amount,
+            Tokens = tokens,
+            TokensAfter = currentTokens + tokens,
             Description = description,
             CreatedAt = DateTime.UtcNow
         }, cancellationToken: ct);
