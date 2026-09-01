@@ -68,7 +68,7 @@ app.UseExceptionHandler(errorApp =>
     errorApp.Run(async context =>
     {
         var exception = context.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>()?.Error;
-        Console.WriteLine($"[ERROR] {exception?.Message}");
+        Console.WriteLine($"[ERROR] {exception}");
 
         context.Response.StatusCode = 500;
         context.Response.ContentType = "application/json";
@@ -76,7 +76,10 @@ app.UseExceptionHandler(errorApp =>
         {
             status = "error",
             code = 500,
-            message = exception?.Message ?? "An unexpected error occurred."
+            // Never echo raw exception text (e.g. MongoDB driver messages) to clients —
+            // log the full exception above instead. Expected failure cases should be
+            // caught and translated to a specific status code by the controller/service.
+            message = "An unexpected error occurred. Please try again."
         });
     });
 });

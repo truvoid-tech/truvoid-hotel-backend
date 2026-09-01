@@ -35,11 +35,19 @@ public class OnboardingController : ControllerBase
     /// </summary>
     [HttpPut("institution")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpdateInstitution([FromBody] InstitutionSetupRequest request, CancellationToken ct)
     {
-        var institutionId = GetInstitutionId();
-        await _onboardingService.UpdateInstitutionAsync(institutionId, request, ct);
-        return Ok(new { message = "Institution profile updated.", nextStep = 2 });
+        try
+        {
+            var institutionId = GetInstitutionId();
+            await _onboardingService.UpdateInstitutionAsync(institutionId, request, ct);
+            return Ok(new { message = "Institution profile updated.", nextStep = 2 });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new ErrorResponse { Code = ErrorCodes.InvalidInput, Message = ex.Message });
+        }
     }
 
     /// <summary>
@@ -47,11 +55,19 @@ public class OnboardingController : ControllerBase
     /// </summary>
     [HttpPut("business")]
     [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> UpdateBusinessInfo([FromBody] BusinessInfoRequest request, CancellationToken ct)
     {
-        var institutionId = GetInstitutionId();
-        await _onboardingService.UpdateBusinessInfoAsync(institutionId, request, ct);
-        return Ok(new { message = "Business info updated.", nextStep = 3 });
+        try
+        {
+            var institutionId = GetInstitutionId();
+            await _onboardingService.UpdateBusinessInfoAsync(institutionId, request, ct);
+            return Ok(new { message = "Business info updated.", nextStep = 3 });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new ErrorResponse { Code = ErrorCodes.InvalidInput, Message = ex.Message });
+        }
     }
 
     /// <summary>

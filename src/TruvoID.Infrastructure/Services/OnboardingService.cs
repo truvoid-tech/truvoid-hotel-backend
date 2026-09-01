@@ -64,7 +64,14 @@ public class OnboardingService : IOnboardingService
         if (institution.OnboardingStep < 2)
             update = update.Set(i => i.OnboardingStep, 2);
 
-        await _db.Institutions.UpdateOneAsync(i => i.Id == institutionId, update, cancellationToken: ct);
+        try
+        {
+            await _db.Institutions.UpdateOneAsync(i => i.Id == institutionId, update, cancellationToken: ct);
+        }
+        catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            throw new InvalidOperationException("An institution with this name already exists.");
+        }
 
         await _auditService.LogAsync(AuditAction.Updated, nameof(Institution), institutionId,
             detailsJson: "{\"step\":\"institution_profile\"}", ct: ct);
@@ -89,7 +96,14 @@ public class OnboardingService : IOnboardingService
         if (institution.OnboardingStep < 3)
             update = update.Set(i => i.OnboardingStep, 3);
 
-        await _db.Institutions.UpdateOneAsync(i => i.Id == institutionId, update, cancellationToken: ct);
+        try
+        {
+            await _db.Institutions.UpdateOneAsync(i => i.Id == institutionId, update, cancellationToken: ct);
+        }
+        catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            throw new InvalidOperationException("An institution with this name already exists.");
+        }
 
         await _auditService.LogAsync(AuditAction.Updated, nameof(Institution), institutionId,
             detailsJson: "{\"step\":\"business_verification\"}", ct: ct);
