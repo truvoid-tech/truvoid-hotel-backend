@@ -1,4 +1,5 @@
 using MongoDB.Driver;
+using TruvoID.Core.Constants;
 using TruvoID.Core.DTOs;
 using TruvoID.Core.Interfaces;
 using TruvoID.Domain.Entities;
@@ -32,6 +33,7 @@ public class WalletService : IWalletService
         return new WalletBalanceResponse
         {
             Balance = lastEntry.BalanceAfter,
+            Tokens = lastEntry.TokensAfter,
             InstitutionId = institutionId,
             LastUpdated = lastEntry.CreatedAt
         };
@@ -68,6 +70,7 @@ public class WalletService : IWalletService
         var sort = Builders<WalletLedgerEntry>.Sort.Descending(e => e.CreatedAt);
         var lastEntry = await _db.WalletLedgerEntries.Find(filter).Sort(sort).FirstOrDefaultAsync(ct);
         var currentBalance = lastEntry?.BalanceAfter ?? 0m;
+        var currentTokens = lastEntry?.TokensAfter ?? 0m;
 
         if (currentBalance < amount)
         {
@@ -78,12 +81,16 @@ public class WalletService : IWalletService
             };
         }
 
+        var tokens = amount / TokenPricing.NairaPerToken;
+
         var entry = new WalletLedgerEntry
         {
             InstitutionId = institutionId,
             Type = WalletTransactionType.Debit,
             Amount = amount,
             BalanceAfter = currentBalance - amount,
+            Tokens = tokens,
+            TokensAfter = currentTokens - tokens,
             ReferenceId = idempotencyKey,
             Description = description
         };
@@ -104,6 +111,8 @@ public class WalletService : IWalletService
         var sort = Builders<WalletLedgerEntry>.Sort.Descending(e => e.CreatedAt);
         var lastEntry = await _db.WalletLedgerEntries.Find(filter).Sort(sort).FirstOrDefaultAsync(ct);
         var currentBalance = lastEntry?.BalanceAfter ?? 0m;
+        var currentTokens = lastEntry?.TokensAfter ?? 0m;
+        var tokens = amount / TokenPricing.NairaPerToken;
 
         var entry = new WalletLedgerEntry
         {
@@ -111,6 +120,8 @@ public class WalletService : IWalletService
             Type = WalletTransactionType.Credit,
             Amount = amount,
             BalanceAfter = currentBalance + amount,
+            Tokens = tokens,
+            TokensAfter = currentTokens + tokens,
             ReferenceId = referenceId,
             Description = description
         };
@@ -141,6 +152,10 @@ public class WalletService : IWalletService
             BalanceAfter = original.Type == WalletTransactionType.Debit
                 ? original.BalanceAfter + original.Amount
                 : original.BalanceAfter - original.Amount,
+            Tokens = original.Tokens,
+            TokensAfter = original.Type == WalletTransactionType.Debit
+                ? original.TokensAfter + original.Tokens
+                : original.TokensAfter - original.Tokens,
             ReferenceId = original.Id.ToString(),
             Description = $"Reversal: {reason}"
         };
@@ -164,6 +179,7 @@ public class WalletService : IWalletService
             Type = e.Type,
             Amount = e.Amount,
             BalanceAfter = e.BalanceAfter,
+            Tokens = e.Tokens,
             Description = e.Description,
             ReferenceId = e.ReferenceId,
             CreatedAt = e.CreatedAt

@@ -45,6 +45,7 @@ public record AdminInstitutionDto
     public string Email { get; init; } = "";
     public string Status { get; init; } = "Active";
     public decimal WalletBalance { get; init; }
+    public decimal Tokens { get; init; }
     public int ApiCallsMtd { get; init; }
     public DateTime JoinedDate { get; init; }
     public string Type { get; init; } = "";
@@ -68,6 +69,7 @@ public record AdminTopUpDto
     public string Institution { get; init; } = "";
     public string Email { get; init; } = "";
     public decimal Amount { get; init; }
+    public decimal Tokens { get; init; }
     public string Reference { get; init; } = "";
     public string Submitted { get; init; } = "";
 }
@@ -78,6 +80,7 @@ public record AdminTransactionDto
     public string Institution { get; init; } = "";
     public string Type { get; init; } = ""; // Wallet Top-Up, API Call
     public decimal Amount { get; init; }
+    public decimal Tokens { get; init; }
     public string Date { get; init; } = "";
 }
 
@@ -87,6 +90,7 @@ public record AdminPricingDto
     public string Type { get; init; } = ""; // NIN, BVN, Phone
     public decimal InstitutionCharge { get; init; }
     public decimal NimcCost { get; init; }
+    public decimal TokenCost { get; init; }
     public decimal Margin => InstitutionCharge - NimcCost;
     public decimal MarginPct => InstitutionCharge > 0 ? Math.Round(Margin / InstitutionCharge * 100, 1) : 0;
 }

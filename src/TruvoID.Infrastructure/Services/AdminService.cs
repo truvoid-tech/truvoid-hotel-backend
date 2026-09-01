@@ -1,6 +1,7 @@
 using TruvoID.Domain.Entities;
 using TruvoID.Domain.Enums;
 using MongoDB.Driver;
+using TruvoID.Core.Constants;
 using TruvoID.Core.DTOs;
 using TruvoID.Core.Interfaces;
 using TruvoID.Infrastructure.Data;
@@ -168,6 +169,7 @@ public class AdminService : IAdminService
                 Email = inst.ContactEmail ?? "",
                 Status = MapInstitutionStatus(inst.Status),
                 WalletBalance = lastEntry?.BalanceAfter ?? 0,
+                Tokens = lastEntry?.TokensAfter ?? 0,
                 ApiCallsMtd = callCount,
                 JoinedDate = inst.CreatedAt,
                 Type = inst.Type.ToString()
@@ -258,6 +260,7 @@ public class AdminService : IAdminService
                 Institution = instDict.GetValueOrDefault(w.InstitutionId)?.Name ?? "Unknown",
                 Email = instDict.GetValueOrDefault(w.InstitutionId)?.ContactEmail ?? "",
                 Amount = w.Amount,
+                Tokens = w.Tokens,
                 Reference = w.ReferenceId ?? "",
                 Submitted = w.CreatedAt.ToString("dd MMM yyyy, HH:mm")
             }).ToList();
@@ -270,6 +273,7 @@ public class AdminService : IAdminService
                 Institution = instDict.GetValueOrDefault(w.InstitutionId)?.Name ?? "Unknown",
                 Type = w.Type == WalletTransactionType.Credit ? "Wallet Top-Up" : "API Call",
                 Amount = w.Type == WalletTransactionType.Credit ? w.Amount : -w.Amount,
+                Tokens = w.Type == WalletTransactionType.Credit ? w.Tokens : -w.Tokens,
                 Date = w.CreatedAt.ToString("dd MMM yyyy, HH:mm")
             }).ToList();
 
@@ -326,7 +330,8 @@ public class AdminService : IAdminService
                 _ => r.Type.ToString()
             },
             InstitutionCharge = r.PricePerCall,
-            NimcCost = r.NimcPartnerCost
+            NimcCost = r.NimcPartnerCost,
+            TokenCost = Math.Ceiling(r.PricePerCall / TokenPricing.NairaPerToken)
         }).ToList();
     }
 
