@@ -12,7 +12,7 @@ public class ResendEmailService : IEmailService
 {
     private readonly HttpClient _http;
     private readonly string _fromAddress;
-    private const string DefaultFromAddress = "TruvoID <noreply@truvoid.com>";
+    private const string DefaultFromAddress = "TruvoID <noreply@gettruvoid.com>";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {

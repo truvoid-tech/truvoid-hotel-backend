@@ -73,7 +73,7 @@ public class RealResendEmailServiceTests
 
         using var doc = await ReadPayloadAsync(request.Content!);
         var root = doc.RootElement;
-        Assert.Equal("TruvoID <noreply@truvoid.com>", root.GetProperty("from").GetString());
+        Assert.Equal("TruvoID <noreply@gettruvoid.com>", root.GetProperty("from").GetString());
         Assert.Equal("Jane Doe <jane@acme.com>", root.GetProperty("to")[0].GetString());
         Assert.Equal("Welcome to TruvoID", root.GetProperty("subject").GetString());
         Assert.Equal("<h1>Hi Jane</h1>", root.GetProperty("html").GetString());
