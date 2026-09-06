@@ -11,7 +11,8 @@ public interface IEmailService
 public class ResendEmailService : IEmailService
 {
     private readonly HttpClient _http;
-    private const string FromAddress = "TruvoID <noreply@truvoid.com>";
+    private readonly string _fromAddress;
+    private const string DefaultFromAddress = "TruvoID <noreply@truvoid.com>";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -21,13 +22,16 @@ public class ResendEmailService : IEmailService
     public ResendEmailService(IHttpClientFactory httpClientFactory)
     {
         _http = httpClientFactory.CreateClient("resend");
+        // Allow the From address to be overridden via env so the sending domain
+        // can be switched without redeploying (must be verified in Resend).
+        _fromAddress = Environment.GetEnvironmentVariable("EMAIL_FROM_ADDRESS") ?? DefaultFromAddress;
     }
 
     public async Task SendAsync(string toEmail, string toName, string subject, string htmlBody)
     {
         var payload = new
         {
-            from = FromAddress,
+            from = _fromAddress,
             to = new[] { string.IsNullOrWhiteSpace(toName) ? toEmail : $"{toName} <{toEmail}>" },
             subject,
             html = htmlBody

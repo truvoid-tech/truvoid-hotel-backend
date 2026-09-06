@@ -264,6 +264,17 @@ public class EmailTemplateTests
         }
     }
 
+    [Fact]
+    public void AllTemplates_EmbedTruvoIDLogo()
+    {
+        foreach (var html in GetAllHtml())
+        {
+            Assert.Contains("gettruvoid.com/assets/images/TruvoID-logo.png", html);
+            Assert.Contains("alt=\"TruvoID\"", html);
+            Assert.Contains("<img", html);
+        }
+    }
+
     // ── Welcome ───────────────────────────────────────────────────────────────
 
     [Fact]
@@ -313,7 +324,7 @@ public class EmailTemplateTests
     public void Approved_HasDashboardCta()
     {
         var html = EmailTemplates.Approved("Acme Corp", "John");
-        Assert.Contains("app.truvoid.com/dashboard", html);
+        Assert.Contains("gettruvoid.com/dashboard", html);
         Assert.Contains("Go to Dashboard", html);
     }
 
@@ -422,7 +433,7 @@ public class EmailTemplateTests
     public void LowBalance_HasTopUpCta()
     {
         var html = EmailTemplates.LowBalance("Acme Corp", 500m, 10000m);
-        Assert.Contains("app.truvoid.com/wallet/topup", html);
+        Assert.Contains("gettruvoid.com/wallet/topup", html);
         Assert.Contains("Top Up Wallet", html);
     }
 
@@ -484,7 +495,7 @@ public class EmailTemplateTests
     public void VerificationResult_HasHistoryLink()
     {
         var html = EmailTemplates.VerificationResult("Acme Corp", "NIN", "Match", "c1", 10m);
-        Assert.Contains("app.truvoid.com/history", html);
+        Assert.Contains("gettruvoid.com/history", html);
         Assert.Contains("verification history", html, StringComparison.OrdinalIgnoreCase);
     }
 

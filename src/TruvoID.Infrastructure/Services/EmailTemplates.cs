@@ -2,6 +2,10 @@ namespace TruvoID.Infrastructure.Services;
 
 public static class EmailTemplates
 {
+    // ── Public URLs ───────────────────────────────────────────────────────────
+    private const string AppBaseUrl = "https://gettruvoid.com";
+    private const string LogoUrl = "https://gettruvoid.com/assets/images/TruvoID-logo.png";
+
     // ── Brand tokens ──────────────────────────────────────────────────────────
     private const string Navy = "#1f3864";
     private const string NavyDark = "#132240";
@@ -85,10 +89,18 @@ public static class EmailTemplates
         <tr><td style=""background:linear-gradient(135deg,{Navy} 0%,{NavyDark} 100%);padding:0;"" class=""email-header"">
           <table width=""100%"" cellpadding=""0"" cellspacing=""0"">
             <tr>
-              <td style=""padding:28px 40px 0;"" class=""email-header"">
-                <span style=""color:{PaperWhite};font-size:22px;font-weight:800;letter-spacing:-0.5px;font-family:'Inter','Segoe UI',sans-serif;"">Truvo<span style=""color:{GoldLight};"">ID</span></span>
+              <td align=""center"" style=""padding:24px 40px 0;"" class=""email-header"">
+                <table cellpadding=""0"" cellspacing=""0"" style=""background:{PaperWhite};border-radius:18px;"">
+                  <tr>
+                    <td style=""padding:12px;"">
+                      <img src=""{LogoUrl}"" alt=""TruvoID"" width=""112"" height=""112"" style=""display:block;width:112px;height:112px;"" />
+                    </td>
+                  </tr>
+                </table>
               </td>
-              <td align=""right"" style=""padding:28px 40px 0;"" class=""email-header-tag"">
+            </tr>
+            <tr>
+              <td align=""center"" style=""padding:14px 40px 26px;"" class=""email-header-tag"">
                 <span style=""color:{GoldLight};font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:3px;font-family:'Inter','Segoe UI',sans-serif;"">Identity Verification</span>
               </td>
             </tr>
@@ -167,7 +179,7 @@ public static class EmailTemplates
           <strong style=""color:{Navy};"">{institutionName}</strong> has been verified and activated. You now have full access to TruvoID's identity verification infrastructure.
         </p>
 
-        {CtaButton("https://app.truvoid.com/dashboard", "Go to Dashboard →", Navy)}
+        {CtaButton($"{AppBaseUrl}/dashboard", "Go to Dashboard →", Navy)}
 
         <div style=""background:{SurfaceLight};border:1px solid {BorderLight};border-radius:10px;padding:24px;margin:0 0 24px;"">
           <p style=""margin:0 0 12px;color:{Navy};font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;"">Quick Start</p>
@@ -282,7 +294,7 @@ public static class EmailTemplates
           </table>
         </div>
 
-        {CtaButton("https://app.truvoid.com/wallet/topup", "Top Up Wallet →", Gold)}
+        {CtaButton($"{AppBaseUrl}/wallet/topup", "Top Up Wallet →", Gold)}
 
         <div style=""background:{WarningBg};border:1px solid #FEC84B;border-radius:10px;padding:16px 20px;margin:0 0 24px;"">
           <p style=""margin:0;color:{WarningAmber};font-size:13px;line-height:1.6;font-weight:500;"">
@@ -329,7 +341,7 @@ public static class EmailTemplates
         {statusCard}
 
         <p style=""margin:0;color:{TextMuted};font-size:13px;line-height:1.7;"" class=""email-muted"">
-          View full details in your <a href=""https://app.truvoid.com/history"" style=""color:{Navy};font-weight:600;text-decoration:none;"">verification history</a>.
+          View full details in your <a href=""{AppBaseUrl}/history"" style=""color:{Navy};font-weight:600;text-decoration:none;"">verification history</a>.
         </p>");
     }
 }

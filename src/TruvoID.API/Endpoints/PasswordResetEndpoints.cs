@@ -46,7 +46,7 @@ public static class PasswordResetEndpoints
             .Set(u => u.UpdatedAt, DateTime.UtcNow);
         await db.Users.UpdateOneAsync(u => u.Id == user.Id, update);
 
-        var baseUrl = config["APP_BASE_URL"] ?? "https://app.truvoid.com";
+        var baseUrl = config["APP_BASE_URL"] ?? "https://gettruvoid.com";
         await notifications.SendPasswordResetAsync(user.Email, user.FullName ?? "Admin", token, baseUrl);
 
         return Results.Ok(new { message = "If that email is registered, a reset link has been sent." });
