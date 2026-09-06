@@ -21,9 +21,13 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
-  <!-- Link real EmailTemplates from Infrastructure so tests validate the actual HTML -->
+  <!-- Link real source files from backend so tests validate the actual code -->
   <ItemGroup>
     <Compile Include="..\..\src\TruvoID.Infrastructure\Services\EmailTemplates.cs" Link="Services\EmailTemplates.cs" />
+    <Compile Include="..\..\src\TruvoID.Infrastructure\Services\EmailService.cs" Link="Services\EmailService.cs" />
+    <Compile Include="..\..\src\TruvoID.Domain\Entities\NotificationEvent.cs" Link="Entities\NotificationEvent.cs" />
+    <Compile Include="..\..\src\TruvoID.Domain\Entities\InstitutionPricing.cs" Link="Entities\InstitutionPricing.cs" />
+    <Compile Include="..\..\src\TruvoID.Domain\Enums\VerificationType.cs" Link="Enums\VerificationType.cs" />
   </ItemGroup>
 
 </Project>
