@@ -1,7 +1,10 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
 using TruvoID.Domain.Entities;
 using TruvoID.Infrastructure.Data;
@@ -117,11 +120,8 @@ public static class AuthEndpoints
         RefreshTokenRequest request,
         MongoDbContext db)
     {
-        // In production, validate the refresh token against a stored token record
-        // For now, accept any non-empty refresh token and issue new tokens
-        // based on the user identity from the old access token
-        var userId = GetUserIdFromToken(request.OldAccessToken);
-        var institutionId = GetInstitutionIdFromToken(request.OldAccessToken);
+        // Validate the old access token and issue new tokens
+        var (userId, institutionId, role) = GetClaimsFromToken(request.OldAccessToken);
 
         if (userId == Guid.Empty || institutionId == Guid.Empty)
             return Results.Unauthorized();
@@ -144,8 +144,13 @@ public static class AuthEndpoints
         HttpContext ctx,
         MongoDbContext db)
     {
-        var userId = ctx.GetUserId();
-        var institutionId = ctx.GetInstitutionId();
+        // Extract claims from the JWT in the Authorization header
+        var authHeader = ctx.Request.Headers.Authorization.ToString();
+        if (!authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            return Results.Unauthorized();
+
+        var token = authHeader["Bearer ".Length..].Trim();
+        var (userId, institutionId, _) = GetClaimsFromToken(token);
 
         if (userId == Guid.Empty || institutionId == Guid.Empty)
             return Results.Unauthorized();
@@ -179,52 +184,79 @@ public static class AuthEndpoints
 
     private static (string access, string refresh, DateTime expires) GenerateTokens(Guid institutionId, Guid userId, string role)
     {
-        // Simplified token generation using a symmetric secret.
-        // In production, replace with proper JWT signing (e.g. System.IdentityModel.Tokens.Jwt).
         var secret = Environment.GetEnvironmentVariable("JWT_SECRET")
             ?? "dev-secret-key-change-in-production-32chars!!!";
 
         var now = DateTime.UtcNow;
-        var expires = now.AddMinutes(60);
+        var expiresAt = now.AddMinutes(60);
 
-        var claims = $"|uid:{userId:N}|inst:{institutionId:N}|role:{role}|exp:{expires.ToString("O")}";
-        var payload = $"{claims}|sig:{Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(claims + secret)))}";
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
+        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-        // access token: short-lived
-        var accessToken = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(payload + ":access"))).Substring(0, 64);
+        var claims = new[]
+        {
+            new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new Claim("institution_id", institutionId.ToString()),
+            new Claim(ClaimTypes.Role, role),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new Claim(JwtRegisteredClaimNames.Iat, new DateTimeOffset(now, DateTimeOffset.Now.Offset).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
+        };
 
-        // refresh token: longer, random
+        var token = new JwtSecurityToken(
+            issuer: "TruvoID",
+            audience: "TruvoID",
+            claims: claims,
+            expires: expiresAt,
+            signingCredentials: credentials
+        );
+
+        var accessToken = new JwtSecurityTokenHandler().WriteToken(token);
+
+        // Refresh token: cryptographically random, stored server-side in production
         var refreshTokenBytes = new byte[32];
         RandomNumberGenerator.Fill(refreshTokenBytes);
         var refreshToken = Convert.ToBase64String(refreshTokenBytes);
 
-        return (accessToken, refreshToken, expires);
+        return (accessToken, refreshToken, expiresAt);
     }
 
-    private static Guid GetUserIdFromToken(string token)
+    private static (Guid userId, Guid institutionId, string role) GetClaimsFromToken(string token)
     {
         try
         {
-            var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(token));
-            var uidMatch = System.Text.RegularExpressions.Regex.Match(decoded, @"\|uid:([^|]+)\|");
-            if (uidMatch.Success && Guid.TryParse(uidMatch.Groups[1].Value, out var uid))
-                return uid;
-        }
-        catch { }
-        return Guid.Empty;
-    }
+            var secret = Environment.GetEnvironmentVariable("JWT_SECRET")
+                ?? "dev-secret-key-change-in-production-32chars!!!";
 
-    private static Guid GetInstitutionIdFromToken(string token)
-    {
-        try
-        {
-            var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(token));
-            var instMatch = System.Text.RegularExpressions.Regex.Match(decoded, @"\|inst:([^|]+)\|");
-            if (instMatch.Success && Guid.TryParse(instMatch.Groups[1].Value, out var instId))
-                return instId;
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
+            var validationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = key,
+                ValidateIssuer = true,
+                ValidIssuer = "TruvoID",
+                ValidateAudience = true,
+                ValidAudience = "TruvoID",
+                ClockSkew = TimeSpan.Zero
+            };
+
+            var principal = tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
+            var jwtToken = (JwtSecurityToken)validatedToken;
+
+            var userId = jwtToken.Claims.Any(c => c.Type == JwtRegisteredClaimNames.Sub)
+                ? Guid.Parse(jwtToken.FindFirst(JwtRegisteredClaimNames.Sub)?.Value ?? Guid.Empty.ToString())
+                : Guid.Empty;
+
+            var institutionId = jwtToken.Claims.Any(c => c.Type == "institution_id")
+                ? Guid.Parse(jwtToken.FindFirst("institution_id")?.Value ?? Guid.Empty.ToString())
+                : Guid.Empty;
+
+            var role = jwtToken.FindFirst(ClaimTypes.Role)?.Value ?? "Admin";
+
+            return (userId, institutionId, role);
         }
         catch { }
-        return Guid.Empty;
+        return (Guid.Empty, Guid.Empty, "");
     }
 
     // ── request/response models ────────────────────────────────────────────────
