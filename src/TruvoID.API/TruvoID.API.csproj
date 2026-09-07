@@ -14,17 +14,19 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Shared core/domain/infrastructure from the workspace (exclude stale EF Migrations) -->
-    <Compile Include="../TruvoID.Core/**/*.cs" Link="Core/%(RecursiveDir)%(Filename)%(Extension)" />
-    <Compile Include="../TruvoID.Domain/**/*.cs" Link="Domain/%(RecursiveDir)%(Filename)%(Extension)" />
-    <Compile Include="../TruvoID.Infrastructure/**/*.cs" Link="Infrastructure/%(RecursiveDir)%(Filename)%(Extension)" />
-    <Compile Remove="../TruvoID.Core/obj/**/*.cs" />
-    <Compile Remove="../TruvoID.Core/bin/**/*.cs" />
-    <Compile Remove="../TruvoID.Domain/obj/**/*.cs" />
-    <Compile Remove="../TruvoID.Domain/bin/**/*.cs" />
-    <Compile Remove="../TruvoID.Infrastructure/obj/**/*.cs" />
-    <Compile Remove="../TruvoID.Infrastructure/bin/**/*.cs" />
-    <Compile Remove="../TruvoID.Infrastructure/Migrations/**/*.cs" />
+    <!-- Shared core/domain/infrastructure, nested here so a Railway build scoped to
+         this folder alone (Root Directory = src/TruvoID.API) is self-contained
+         (exclude stale EF Migrations) -->
+    <Compile Include="TruvoID.Core/**/*.cs" Link="Core/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="TruvoID.Domain/**/*.cs" Link="Domain/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="TruvoID.Infrastructure/**/*.cs" Link="Infrastructure/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Remove="TruvoID.Core/obj/**/*.cs" />
+    <Compile Remove="TruvoID.Core/bin/**/*.cs" />
+    <Compile Remove="TruvoID.Domain/obj/**/*.cs" />
+    <Compile Remove="TruvoID.Domain/bin/**/*.cs" />
+    <Compile Remove="TruvoID.Infrastructure/obj/**/*.cs" />
+    <Compile Remove="TruvoID.Infrastructure/bin/**/*.cs" />
+    <Compile Remove="TruvoID.Infrastructure/Migrations/**/*.cs" />
   </ItemGroup>
 
   <ItemGroup>
