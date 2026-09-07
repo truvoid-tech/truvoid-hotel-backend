@@ -314,7 +314,7 @@ public static class WalletEndpoints
         var revenue = await db.WalletLedgers
             .Aggregate()
             .Match(revenueFilter)
-            .Group(null, g => new { Total = g.Sum(x => x.Amount) })
+            .Group(x => 1, g => new { Total = g.Sum(x => x.Amount) })
             .FirstOrDefaultAsync();
 
         // Costs: sum of all credit transactions this month  
@@ -325,7 +325,7 @@ public static class WalletEndpoints
         var costs = await db.WalletLedgers
             .Aggregate()
             .Match(costFilter)
-            .Group(null, g => new { Total = g.Sum(x => x.Amount) })
+            .Group(x => 1, g => new { Total = g.Sum(x => x.Amount) })
             .FirstOrDefaultAsync();
 
         // Top-up approval records this month

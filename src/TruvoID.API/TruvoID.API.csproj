@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <!-- Endpoint files live here -->
+    <Compile Include="Endpoints/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Shared core/domain/infrastructure from the workspace (exclude stale EF Migrations) -->
+    <Compile Include="../TruvoID.Core/**/*.cs" Link="Core/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="../TruvoID.Domain/**/*.cs" Link="Domain/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="../TruvoID.Infrastructure/**/*.cs" Link="Infrastructure/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Remove="../TruvoID.Core/obj/**/*.cs" />
+    <Compile Remove="../TruvoID.Core/bin/**/*.cs" />
+    <Compile Remove="../TruvoID.Domain/obj/**/*.cs" />
+    <Compile Remove="../TruvoID.Domain/bin/**/*.cs" />
+    <Compile Remove="../TruvoID.Infrastructure/obj/**/*.cs" />
+    <Compile Remove="../TruvoID.Infrastructure/bin/**/*.cs" />
+    <Compile Remove="../TruvoID.Infrastructure/Migrations/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.*" />
+    <PackageReference Include="MongoDB.Driver" Version="3.11.1" />
+  </ItemGroup>
+
+</Project>

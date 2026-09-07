@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -176,7 +177,7 @@ public static class AuthEndpoints
 
     // ── helpers ────────────────────────────────────────────────────────────────
 
-    private static string HashPassword(string password)
+    internal static string HashPassword(string password)
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(password));
         return Convert.ToHexString(bytes).ToLowerInvariant();
@@ -197,6 +198,7 @@ public static class AuthEndpoints
         {
             new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
             new Claim("institution_id", institutionId.ToString()),
+            new Claim("role", role),
             new Claim(ClaimTypes.Role, role),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new Claim(JwtRegisteredClaimNames.Iat, new DateTimeOffset(now, DateTimeOffset.Now.Offset).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
@@ -244,14 +246,14 @@ public static class AuthEndpoints
             var jwtToken = (JwtSecurityToken)validatedToken;
 
             var userId = jwtToken.Claims.Any(c => c.Type == JwtRegisteredClaimNames.Sub)
-                ? Guid.Parse(jwtToken.FindFirst(JwtRegisteredClaimNames.Sub)?.Value ?? Guid.Empty.ToString())
+                ? Guid.Parse(principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value ?? Guid.Empty.ToString())
                 : Guid.Empty;
 
             var institutionId = jwtToken.Claims.Any(c => c.Type == "institution_id")
-                ? Guid.Parse(jwtToken.FindFirst("institution_id")?.Value ?? Guid.Empty.ToString())
+                ? Guid.Parse(principal.FindFirst("institution_id")?.Value ?? Guid.Empty.ToString())
                 : Guid.Empty;
 
-            var role = jwtToken.FindFirst(ClaimTypes.Role)?.Value ?? "Admin";
+            var role = principal.FindFirst(ClaimTypes.Role)?.Value ?? "Admin";
 
             return (userId, institutionId, role);
         }

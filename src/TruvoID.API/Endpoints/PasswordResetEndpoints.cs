@@ -66,7 +66,7 @@ public static class PasswordResetEndpoints
         if (user is null || user.PasswordResetTokenExpiry < DateTime.UtcNow)
             return Results.BadRequest(new { error = "Reset link is invalid or has expired." });
 
-        var newHash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
+        var newHash = AuthEndpoints.HashPassword(req.NewPassword);
 
         var update = Builders<User>.Update
             .Set(u => u.PasswordHash, newHash)
