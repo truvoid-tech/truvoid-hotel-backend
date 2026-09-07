@@ -72,6 +72,9 @@ public static class PasswordResetEndpoints
             .Set(u => u.PasswordHash, newHash)
             .Set(u => u.PasswordResetToken, null)
             .Set(u => u.PasswordResetTokenExpiry, null)
+            // Also activates staff accounts created via the onboarding invite flow,
+            // which start inactive until the invited user sets a real password here.
+            .Set(u => u.IsActive, true)
             .Set(u => u.UpdatedAt, DateTime.UtcNow);
         await db.Users.UpdateOneAsync(u => u.Id == user.Id, update);
 

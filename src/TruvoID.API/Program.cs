@@ -96,6 +96,7 @@ builder.Services.AddScoped<NotificationPreferenceService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IWalletService, WalletService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<IVerificationService, VerificationService>();
 
 // Mailer: swap ResendEmailService for a no-op dev implementation if you
 // set NOTIFICATIONS_DISABLED=1 so local dev doesn't blow up on missing API keys.

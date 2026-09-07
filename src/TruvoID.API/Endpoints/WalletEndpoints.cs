@@ -85,10 +85,11 @@ public static class WalletEndpoints
     }
 
     private static async Task<IResult> InitiateTopUp(
+        HttpContext ctx,
         InitiateTopUpRequest request,
         MongoDbContext db)
     {
-        var institutionId = GetInstitutionIdFromAuthHeader();
+        var institutionId = ctx.GetInstitutionId();
         if (institutionId == Guid.Empty)
             return Results.Unauthorized();
 
@@ -388,12 +389,6 @@ public static class WalletEndpoints
     }
 
     // ── helpers ────────────────────────────────────────────────────────────────
-
-    private static Guid GetInstitutionIdFromAuthHeader()
-    {
-        // Simplified: in production, parse from JWT
-        return Guid.Empty;
-    }
 
     private static WalletTransactionResponse MapTransaction(WalletLedger l)
     {
