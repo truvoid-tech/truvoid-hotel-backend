@@ -1,7 +1,6 @@
-namespace TruvoID.Components.Services;
+namespace TruvoID.Core.DTOs;
 
-// ──────────────────────────── Admin DTOs ────────────────────────────
-
+// ─── Admin Overview ───
 public record AdminOverviewDto
 {
     public decimal RevenueMtd { get; init; }
@@ -36,16 +35,29 @@ public record CallBreakdownDto
     public int Total => NinCalls + BvnCalls + PhoneCalls;
 }
 
+// ─── Admin Institutions ───
 public record AdminInstitutionDto
 {
     public string Id { get; init; } = string.Empty;
     public string Name { get; init; } = "";
     public string Email { get; init; } = "";
-    public string Status { get; init; } = "Pending"; // Active, Pending, Suspended
+    public string Status { get; init; } = "Active";
     public decimal WalletBalance { get; init; }
     public int ApiCallsMtd { get; init; }
     public DateTime JoinedDate { get; init; }
     public string Type { get; init; } = "";
+}
+
+// ─── Admin Financials ───
+public record AdminFinancialsDto
+{
+    public decimal GrossRevenue { get; init; }
+    public decimal NimcPayouts { get; init; }
+    public decimal NetProfit { get; init; }
+    public decimal MarginPct { get; init; }
+    public int TotalCalls { get; init; }
+    public List<AdminTopUpDto> PendingTopUps { get; init; } = [];
+    public List<AdminTransactionDto> Transactions { get; init; } = [];
 }
 
 public record AdminTopUpDto
@@ -68,18 +80,8 @@ public record AdminTransactionDto
     public string Date { get; init; } = "";
 }
 
-public record AdminFinancialsDto
-{
-    public decimal GrossRevenue { get; init; }
-    public decimal NimcPayouts { get; init; }
-    public decimal NetProfit { get; init; }
-    public decimal MarginPct { get; init; }
-    public int TotalCalls { get; init; }
-    public List<AdminTopUpDto> PendingTopUps { get; init; } = [];
-    public List<AdminTransactionDto> Transactions { get; init; } = [];
-}
-
-public record PricingDto
+// ─── Admin Pricing ───
+public record AdminPricingDto
 {
     public string Type { get; init; } = ""; // NIN, BVN, Phone
     public decimal InstitutionCharge { get; init; }
@@ -94,7 +96,7 @@ public record UpdatePricingRequest
     public decimal NimcCost { get; set; }
 }
 
-// ─── Per-Institution Pricing DTOs ───
+// ─── Per-Institution Pricing (FE pages need this) ───
 public record InstitutionPricingAdminDto
 {
     public string InstitutionId { get; init; } = string.Empty;
@@ -121,8 +123,7 @@ public record UpdateInstitutionPricingRequest
     public decimal PhoneCost { get; set; }
 }
 
-// ──────────────────────────── API Audit ─────────────────────────────────
-
+// ─── API Audit ───
 public class AdminApiKeyDto
 {
     public string Id { get; set; } = string.Empty;
@@ -135,8 +136,7 @@ public class AdminApiKeyDto
     public DateTime? LastUsedAt { get; set; }
 }
 
-// ──────────────────────────── Paginated List ────────────────────────────
-
+// ─── Paginated List ───
 public record PaginatedList<T>
 {
     public List<T> Items { get; init; } = [];
@@ -146,13 +146,13 @@ public record PaginatedList<T>
     public int TotalPages => (int)Math.Ceiling((double)TotalCount / PageSize);
 }
 
-// ─── NIMC Config DTO ───
+// ─── NIMC Config ───
 public record NimcEnvironmentDto
 {
     public string ActiveEnvironment { get; init; } = "sandbox";
 }
 
-// ─── Admin Management DTOs ───
+// ─── Admin Management ───
 public record AdminUserDto
 {
     public string UserId { get; init; } = string.Empty;
@@ -166,12 +166,12 @@ public record AdminUserDto
 
 public record InviteAdminRequest
 {
-    public string Email { get; init; } = string.Empty;
-    public string FullName { get; init; } = string.Empty;
-    public string Password { get; init; } = string.Empty;
+    public string Email { get; init; } = "";
+    public string FullName { get; init; } = "";
+    public string Password { get; init; } = "";
 }
 
-// ─── Audit Log DTOs ───
+// ─── Audit Log ───
 public record AuditLogEntryDto
 {
     public string Id { get; init; } = string.Empty;
@@ -183,20 +183,20 @@ public record AuditLogEntryDto
     public DateTime CreatedAt { get; init; }
 }
 
-// ─── Low Balance Alert DTOs ───
+// ─── Low Balance Alert ───
 public record LowBalanceAlertDto
 {
-    public string InstitutionId { get; init; } = string.Empty;
-    public string InstitutionName { get; init; } = string.Empty;
-    public string ContactEmail { get; init; } = string.Empty;
+    public string InstitutionId { get; init; } = "";
+    public string InstitutionName { get; init; } = "";
+    public string ContactEmail { get; init; } = "";
     public decimal CurrentBalance { get; init; }
     public decimal AlertThreshold { get; init; }
     public int CallsLast30Days { get; init; }
     public decimal AvgDailySpend { get; init; }
 }
 
-// ─── Role Management DTOs ───
+// ─── Role Management ───
 public record UpdateRoleRequest
 {
-    public string Role { get; init; } = string.Empty;
+    public string Role { get; init; } = "";
 }
