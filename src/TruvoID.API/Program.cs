@@ -14,7 +14,10 @@ var port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
 builder.WebHost.UseUrls($"http://+:{port}");
 
 // ── Configuration ─────────────────────────────────────────────────────────
-var mongoConnectionString = builder.Configuration["MongoDb:ConnectionString"]
+// Railway sets ConnectionStrings__MongoDb, which ASP.NET's env var provider
+// maps to config key "ConnectionStrings:MongoDb" — read it via GetConnectionString
+// rather than a made-up key/env var name that nothing actually sets.
+var mongoConnectionString = builder.Configuration.GetConnectionString("MongoDb")
     ?? Environment.GetEnvironmentVariable("MONGO_CONNECTION_STRING")
     ?? "mongodb://localhost:27017";
 var mongoDatabase = builder.Configuration["MongoDb:Database"]
@@ -30,9 +33,14 @@ builder.Services.AddSingleton<MongoDbContext>(sp =>
 });
 
 // ── JWT auth ──────────────────────────────────────────────────────────────
-var jwtSecret = builder.Configuration["Jwt:Secret"]
+// Railway sets Jwt__SecretKey / Jwt__Issuer / Jwt__Audience (maps to Jwt:SecretKey
+// etc. via the env var provider) — must read the same keys AuthEndpoints uses to
+// sign tokens, or issued tokens fail validation here.
+var jwtSecret = builder.Configuration["Jwt:SecretKey"]
     ?? Environment.GetEnvironmentVariable("JWT_SECRET")
     ?? "dev-secret-key-change-in-production-32chars!!!";
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "TruvoID";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "TruvoID";
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -42,9 +50,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
             ValidateIssuer = true,
-            ValidIssuer = "TruvoID",
+            ValidIssuer = jwtIssuer,
             ValidateAudience = true,
-            ValidAudience = "TruvoID",
+            ValidAudience = jwtAudience,
             ClockSkew = TimeSpan.Zero
         };
     });
@@ -62,10 +70,14 @@ builder.Services.AddHttpClient("idaccess", client =>
     client.BaseAddress = new Uri("https://idaccess.info/v1/");
     client.DefaultRequestHeaders.Add("Accept", "application/json");
 });
+var resendApiKey = Environment.GetEnvironmentVariable("Resend_API_Key")
+    ?? Environment.GetEnvironmentVariable("RESEND_API_KEY");
 builder.Services.AddHttpClient("resend", client =>
 {
     client.BaseAddress = new Uri("https://api.resend.com/");
     client.DefaultRequestHeaders.Add("Accept", "application/json");
+    if (!string.IsNullOrEmpty(resendApiKey))
+        client.DefaultRequestHeaders.Add("Authorization", $"Bearer {resendApiKey}");
 });
 
 // ── Application services ──────────────────────────────────────────────────

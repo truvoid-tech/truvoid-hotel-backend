@@ -183,15 +183,25 @@ public static class AuthEndpoints
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
+    // Railway sets Jwt__SecretKey / Jwt__Issuer / Jwt__Audience / Jwt__ExpiryMinutes
+    // (JWT_SECRET is kept as a fallback name). Must match what Program.cs reads for
+    // token validation, or tokens issued here never validate.
+    private static string JwtSecret =>
+        Environment.GetEnvironmentVariable("Jwt__SecretKey")
+        ?? Environment.GetEnvironmentVariable("JWT_SECRET")
+        ?? "dev-secret-key-change-in-production-32chars!!!";
+
+    private static string JwtIssuer => Environment.GetEnvironmentVariable("Jwt__Issuer") ?? "TruvoID";
+    private static string JwtAudience => Environment.GetEnvironmentVariable("Jwt__Audience") ?? "TruvoID";
+    private static int JwtExpiryMinutes =>
+        int.TryParse(Environment.GetEnvironmentVariable("Jwt__ExpiryMinutes"), out var m) ? m : 60;
+
     private static (string access, string refresh, DateTime expires) GenerateTokens(Guid institutionId, Guid userId, string role)
     {
-        var secret = Environment.GetEnvironmentVariable("JWT_SECRET")
-            ?? "dev-secret-key-change-in-production-32chars!!!";
-
         var now = DateTime.UtcNow;
-        var expiresAt = now.AddMinutes(60);
+        var expiresAt = now.AddMinutes(JwtExpiryMinutes);
 
-        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtSecret));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
         var claims = new[]
@@ -205,8 +215,8 @@ public static class AuthEndpoints
         };
 
         var token = new JwtSecurityToken(
-            issuer: "TruvoID",
-            audience: "TruvoID",
+            issuer: JwtIssuer,
+            audience: JwtAudience,
             claims: claims,
             expires: expiresAt,
             signingCredentials: credentials
@@ -226,19 +236,16 @@ public static class AuthEndpoints
     {
         try
         {
-            var secret = Environment.GetEnvironmentVariable("JWT_SECRET")
-                ?? "dev-secret-key-change-in-production-32chars!!!";
-
             var tokenHandler = new JwtSecurityTokenHandler();
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtSecret));
             var validationParameters = new TokenValidationParameters
             {
                 ValidateIssuerSigningKey = true,
                 IssuerSigningKey = key,
                 ValidateIssuer = true,
-                ValidIssuer = "TruvoID",
+                ValidIssuer = JwtIssuer,
                 ValidateAudience = true,
-                ValidAudience = "TruvoID",
+                ValidAudience = JwtAudience,
                 ClockSkew = TimeSpan.Zero
             };
 
