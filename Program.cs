@@ -54,4 +54,30 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
+// TEMPORARY diagnostic route — uses the exact same HttpClient the app makes real
+// API calls with, so it reproduces whatever is causing "Unable to connect" instead
+// of guessing from outside the container. Remove once the connectivity issue is found.
+app.MapGet("/diag/api-check", async (HttpClient http) =>
+{
+    var result = new Dictionary<string, object?> { ["baseAddress"] = http.BaseAddress?.ToString() };
+    try
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var resp = await http.GetAsync("/v1/auth/me");
+        sw.Stop();
+        var body = await resp.Content.ReadAsStringAsync();
+        result["elapsedMs"] = sw.ElapsedMilliseconds;
+        result["statusCode"] = (int)resp.StatusCode;
+        result["body"] = body.Length > 300 ? body[..300] : body;
+    }
+    catch (Exception ex)
+    {
+        result["exceptionType"] = ex.GetType().FullName;
+        result["message"] = ex.Message;
+        result["innerExceptionType"] = ex.InnerException?.GetType().FullName;
+        result["innerMessage"] = ex.InnerException?.Message;
+    }
+    return Results.Json(result);
+});
+
 app.Run();
