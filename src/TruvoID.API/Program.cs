@@ -1,11 +1,19 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
+using MongoDB.Bson.Serialization.Serializers;
 using MongoDB.Driver;
 using System.Text;
 using TruvoID.API.Endpoints;
 using TruvoID.Core.Interfaces;
 using TruvoID.Infrastructure.Data;
 using TruvoID.Infrastructure.Services;
+
+// MongoDB.Driver 3.x no longer assumes a Guid representation — every entity here
+// uses a Guid Id, so without this any insert/update touching a Guid field throws
+// "Cannot serialize a Guid without knowing its representation" at the first write.
+BsonSerializer.RegisterSerializer(new GuidSerializer(GuidRepresentation.Standard));
 
 var builder = WebApplication.CreateBuilder(args);
 
