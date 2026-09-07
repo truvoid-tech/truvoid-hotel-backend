@@ -16,6 +16,7 @@
 
         <!-- Include Admin DTOs from backend so frontend pages can use them for API deserialization -->
         <Compile Include="src\TruvoID.Core\DTOs\AdminDtos.cs" Link="DTOs\AdminDtos.cs" />
+        <Compile Include="src\TruvoID.Core\DTOs\NimcConfigDtos.cs" Link="DTOs\NimcConfigDtos.cs" />
 
         <!-- tests/ folder is a separate xunit project — exclude from FE compilation -->
         <Compile Remove="tests\**" />

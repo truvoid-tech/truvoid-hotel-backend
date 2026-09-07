@@ -201,7 +201,7 @@
         }
     }
 
-    private async Task OnRoleChanged(string userId, ChangeEventArgs e)
+    private async Task OnRoleChanged(Guid userId, ChangeEventArgs e)
     {
         var newRole = e.Value?.ToString() ?? "";
         if (string.IsNullOrEmpty(newRole)) return;

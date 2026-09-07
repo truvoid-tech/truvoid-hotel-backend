@@ -19,7 +19,7 @@ public record AdminOverviewDto
 
 public record InstitutionVolumeDto
 {
-    public string Id { get; init; } = string.Empty;
+    public Guid Id { get; init; }
     public string Name { get; init; } = "";
     public string Email { get; init; } = "";
     public int CallsMtd { get; init; }
@@ -38,11 +38,12 @@ public record CallBreakdownDto
 // ─── Admin Institutions ───
 public record AdminInstitutionDto
 {
-    public string Id { get; init; } = string.Empty;
+    public Guid Id { get; init; }
     public string Name { get; init; } = "";
     public string Email { get; init; } = "";
     public string Status { get; init; } = "Active";
     public decimal WalletBalance { get; init; }
+    public decimal Tokens { get; init; }
     public int ApiCallsMtd { get; init; }
     public DateTime JoinedDate { get; init; }
     public string Type { get; init; } = "";
@@ -62,10 +63,11 @@ public record AdminFinancialsDto
 
 public record AdminTopUpDto
 {
-    public string Id { get; init; } = string.Empty;
+    public Guid Id { get; init; }
     public string Institution { get; init; } = "";
     public string Email { get; init; } = "";
     public decimal Amount { get; init; }
+    public decimal Tokens { get; init; }
     public string Reference { get; init; } = "";
     public string Submitted { get; init; } = "";
     public string Status { get; init; } = "Pending";
@@ -77,6 +79,7 @@ public record AdminTransactionDto
     public string Institution { get; init; } = "";
     public string Type { get; init; } = ""; // Wallet Top-Up, API Call
     public decimal Amount { get; init; }
+    public decimal Tokens { get; init; }
     public string Date { get; init; } = "";
 }
 
@@ -86,6 +89,7 @@ public record AdminPricingDto
     public string Type { get; init; } = ""; // NIN, BVN, Phone
     public decimal InstitutionCharge { get; init; }
     public decimal NimcCost { get; init; }
+    public decimal TokenCost { get; init; }
     public decimal Margin => InstitutionCharge - NimcCost;
     public decimal MarginPct => InstitutionCharge > 0 ? Math.Round(Margin / InstitutionCharge * 100, 1) : 0;
 }
@@ -96,10 +100,10 @@ public record UpdatePricingRequest
     public decimal NimcCost { get; set; }
 }
 
-// ─── Per-Institution Pricing (FE pages need this) ───
+// ─── Per-Institution Pricing ───
 public record InstitutionPricingAdminDto
 {
-    public string InstitutionId { get; init; } = string.Empty;
+    public Guid InstitutionId { get; init; }
     public string InstitutionName { get; init; } = "";
     public string Email { get; init; } = "";
     public string Status { get; init; } = "";
@@ -126,7 +130,7 @@ public record UpdateInstitutionPricingRequest
 // ─── API Audit ───
 public class AdminApiKeyDto
 {
-    public string Id { get; set; } = string.Empty;
+    public Guid Id { get; set; }
     public string InstitutionName { get; set; } = string.Empty;
     public string KeyPrefix { get; set; } = string.Empty;
     public string? Description { get; set; }
@@ -149,7 +153,7 @@ public record PaginatedList<T>
 // ─── Admin Management ───
 public record AdminUserDto
 {
-    public string UserId { get; init; } = string.Empty;
+    public Guid UserId { get; init; }
     public string Email { get; init; } = string.Empty;
     public string FullName { get; init; } = string.Empty;
     public string Role { get; init; } = string.Empty;
@@ -160,29 +164,30 @@ public record AdminUserDto
 
 public record InviteAdminRequest
 {
-    public string Email { get; init; } = "";
-    public string FullName { get; init; } = "";
-    public string Password { get; init; } = "";
+    public string Email { get; init; } = string.Empty;
+    public string FullName { get; init; } = string.Empty;
+    public string Password { get; init; } = string.Empty;
 }
 
 // ─── Audit Log ───
 public record AuditLogEntryDto
 {
-    public string Id { get; init; } = string.Empty;
+    public Guid Id { get; init; }
     public string? ActorEmail { get; init; }
     public string ActorType { get; init; } = string.Empty;
     public string Action { get; init; } = string.Empty;
     public string Entity { get; init; } = string.Empty;
     public string? DetailsJson { get; init; }
+    public Guid EntityId { get; init; }
     public DateTime CreatedAt { get; init; }
 }
 
 // ─── Low Balance Alert ───
 public record LowBalanceAlertDto
 {
-    public string InstitutionId { get; init; } = "";
-    public string InstitutionName { get; init; } = "";
-    public string ContactEmail { get; init; } = "";
+    public string InstitutionId { get; init; } = string.Empty;
+    public string InstitutionName { get; init; } = string.Empty;
+    public string ContactEmail { get; init; } = string.Empty;
     public decimal CurrentBalance { get; init; }
     public decimal AlertThreshold { get; init; }
     public int CallsLast30Days { get; init; }
@@ -192,5 +197,11 @@ public record LowBalanceAlertDto
 // ─── Role Management ───
 public record UpdateRoleRequest
 {
-    public string Role { get; init; } = "";
+    public string Role { get; init; } = string.Empty;
+}
+
+public class CreditWalletRequest
+{
+    public decimal Amount { get; set; }
+    public string? Description { get; set; }
 }

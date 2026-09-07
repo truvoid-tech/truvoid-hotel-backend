@@ -47,7 +47,7 @@
                     @foreach (var inst in FilteredInstitutions)
                     {
                         <button @onclick="() => SelectInstitution(inst)"
-                                class="w-full text-left px-4 py-3 border-b border-outline-variant/50 hover:bg-surface-container-low transition-colors @(inst.InstitutionId == _selectedId ? "bg-primary/5 border-l-2 border-l-primary" : "")">
+                                class="w-full text-left px-4 py-3 border-b border-outline-variant/50 hover:bg-surface-container-low transition-colors @(IsSelected(inst) ? "bg-primary/5 border-l-2 border-l-primary" : "")">
                             <p class="font-label-md text-label-md text-on-surface truncate">@inst.InstitutionName</p>
                             <p class="font-body-sm text-[11px] text-slate-gray truncate">@inst.Email</p>
                         </button>
@@ -223,7 +223,7 @@
 
     private List<InstitutionPricingAdminDto> _institutions = [];
     private InstitutionPricingAdminDto? _selected;
-    private string? _selectedId;
+    private Guid? _selectedId;
 
     // Pricing fields for selected institution
     private decimal _ninCharge = 100;
@@ -235,6 +235,8 @@
 
     private IEnumerable<InstitutionPricingAdminDto> FilteredInstitutions => _institutions
         .Where(i => string.IsNullOrEmpty(_search) || i.InstitutionName.Contains(_search, StringComparison.OrdinalIgnoreCase) || i.Email.Contains(_search, StringComparison.OrdinalIgnoreCase));
+
+    private bool IsSelected(InstitutionPricingAdminDto inst) => inst.InstitutionId == _selectedId;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -288,7 +290,7 @@
             });
 
             // Update local state
-            var idx = _institutions.FindIndex(i => i.InstitutionId == _selected.InstitutionId);
+            var idx = _institutions.FindIndex(i => i.InstitutionId == _selected!.InstitutionId);
             if (idx >= 0)
             {
                 _institutions[idx] = _institutions[idx] with
