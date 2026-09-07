@@ -10,7 +10,7 @@
 
     <div class="mb-section-gap">
         <h1 class="font-headline-lg text-headline-lg text-deep-navy mb-2">Replenish Balance</h1>
-        <p class="font-body-md text-body-md text-slate-gray">Select an amount and preferred payment method to add funds to your institutional account.</p>
+        <p class="font-body-md text-body-md text-slate-gray">Fund your wallet via bank transfer. No card or online payment required.</p>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
@@ -53,46 +53,99 @@
                     </div>
                     <p class="mt-2 font-body-sm text-body-sm text-slate-gray">Minimum deposit: &#8358;50,000</p>
                 </div>
-            </section>
+            </section>            <!-- Payment Instructions -->
+                <section class="bg-paper-white p-8 rounded-lg border border-surface-variant shadow-[0_12px_32px_-4px_rgba(31,56,100,0.05)]">
+                    <h3 class="font-label-sm text-label-sm text-deep-navy uppercase mb-6 tracking-widest">How to Replenish</h3>
+                    <p class="font-body-sm text-body-sm text-slate-gray mb-6">
+                        Since we no longer use Paystack or Flutterwave, please follow the steps below to fund your wallet:
+                    </p>
 
-            <!-- Payment Method -->
-            <section class="bg-paper-white p-8 rounded-lg border border-surface-variant shadow-[0_12px_32px_-4px_rgba(31,56,100,0.05)]">
-                <h3 class="font-label-sm text-label-sm text-deep-navy uppercase mb-6 tracking-widest">Payment Method</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <!-- Paystack -->
-                    <label class="cursor-pointer">
-                        <input class="peer sr-only" type="radio" name="payment" value="paystack" checked="@(_paymentMethod == "paystack")" @onchange='() => _paymentMethod = "paystack"' />
-                        <div class="p-6 border border-outline-variant rounded-lg peer-checked:border-deep-navy peer-checked:bg-surface-bright flex items-center justify-between transition-all">
-                            <div class="flex items-center gap-4">
-                                <div class="w-12 h-12 bg-[#00C3F7] rounded flex items-center justify-center">
-                                    <span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">account_balance</span>
+                    <div class="space-y-5">
+                        <!-- Step 1: Bank Account -->
+                        <div class="bg-surface-container-low border border-outline-variant rounded p-5">
+                            <div class="flex items-start gap-4">
+                                <div class="w-8 h-8 rounded-full bg-warm-gold flex items-center justify-center shrink-0 mt-0.5">
+                                    <span class="material-symbols-outlined text-[15px] text-paper-white" style="font-variation-settings: 'FILL' 1;">account_balance</span>
                                 </div>
                                 <div>
-                                    <span class="block font-label-md text-label-md text-deep-navy">Paystack</span>
-                                    <span class="block font-body-sm text-body-sm text-slate-gray">Card, Bank Transfer</span>
+                                    <p class="font-label-md text-label-md text-on-surface mb-1">Step 1: Transfer to our Bank Account</p>
+                                    <div class="bg-surface-container p-4 rounded border border-outline-variant mb-3">
+                                        <div class="grid grid-cols-2 gap-4 text-sm">
+                                            <div>
+                                                <p class="font-label-sm text-label-sm text-slate-gray uppercase tracking-wider">Bank</p>
+                                                <p class="font-body-md text-body-md text-on-surface font-semibold">Guaranty Trust Bank (GTBank)</p>
+                                            </div>
+                                            <div>
+                                                <p class="font-label-sm text-label-sm text-slate-gray uppercase tracking-wider">Account Name</p>
+                                                <p class="font-body-md text-body-md text-on-surface font-semibold">TruvoID Operations Ltd</p>
+                                            </div>
+                                            <div>
+                                                <p class="font-label-sm text-label-sm text-slate-gray uppercase tracking-wider">Account Number</p>
+                                                <p class="font-body-md text-body-md text-on-surface font-semibold font-mono">0000000000</p>
+                                            </div>
+                                            <div>
+                                                <p class="font-label-sm text-label-sm text-slate-gray uppercase tracking-wider">Account Number (alt)</p>
+                                                <p class="font-body-md text-body-md text-on-surface font-semibold font-mono">0000000001</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p class="font-body-sm text-body-sm text-slate-gray">
+                                        Transfer the exact amount shown above to any of the accounts above. Keep the transfer reference.
+                                    </p>
                                 </div>
                             </div>
-                            <span class="material-symbols-outlined text-deep-navy opacity-0 peer-checked:opacity-100 transition-opacity" style="font-variation-settings: 'FILL' 1;">check_circle</span>
                         </div>
-                    </label>
-                    <!-- Flutterwave -->
-                    <label class="cursor-pointer">
-                        <input class="peer sr-only" type="radio" name="payment" value="flutterwave" checked="@(_paymentMethod == "flutterwave")" @onchange='() => _paymentMethod = "flutterwave"' />
-                        <div class="p-6 border border-outline-variant rounded-lg peer-checked:border-deep-navy peer-checked:bg-surface-bright flex items-center justify-between transition-all">
-                            <div class="flex items-center gap-4">
-                                <div class="w-12 h-12 bg-[#F5A623] rounded flex items-center justify-center">
-                                    <span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">flash_on</span>
+
+                        <!-- Step 2: WhatsApp Receipt -->
+                        <div class="bg-surface-container-low border border-outline-variant rounded p-5">
+                            <div class="flex items-start gap-4">
+                                <div class="w-8 h-8 rounded-full bg-deep-navy flex items-center justify-center shrink-0 mt-0.5">
+                                    <span class="material-symbols-outlined text-[15px] text-paper-white" style="font-variation-settings: 'FILL' 1;">chat</span>
                                 </div>
                                 <div>
-                                    <span class="block font-label-md text-label-md text-deep-navy">Flutterwave</span>
-                                    <span class="block font-body-sm text-body-sm text-slate-gray">Card, USSD, Bank</span>
+                                    <p class="font-label-md text-label-md text-on-surface mb-1">Step 2: Send your receipt to WhatsApp</p>
+                                    <p class="font-body-sm text-body-sm text-slate-gray mb-3">
+                                        Once you've made the transfer, send the payment receipt (screenshot or transfer reference) to our WhatsApp line so we can verify and credit your account:
+                                    </p>
+                                    <div class="bg-[#E6F4EA] border border-[#CEead6] rounded p-4 flex items-center gap-3">
+                                        <span class="material-symbols-outlined text-[#137333] text-[24px]" style="font-variation-settings: 'FILL' 1;">chat</span>
+                                        <div>
+                                            <p class="font-label-md text-label-md text-[#137333] font-semibold">+234 800 000 0000</p>
+                                            <p class="font-body-sm text-[11px] text-[#137333]">TruvoID WhatsApp Support — send your transfer receipt here</p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <span class="material-symbols-outlined text-deep-navy opacity-0 peer-checked:opacity-100 transition-opacity" style="font-variation-settings: 'FILL' 1;">check_circle</span>
                         </div>
-                    </label>
-                </div>
-            </section>
+
+                        <!-- Step 3: Confirm -->
+                        <div class="bg-surface-container-low border border-outline-variant rounded p-5">
+                            <div class="flex items-start gap-4">
+                                <div class="w-8 h-8 rounded-full bg-[#b06000] flex items-center justify-center shrink-0 mt-0.5">
+                                    <span class="material-symbols-outlined text-[15px] text-paper-white" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                                </div>
+                                <div>
+                                    <p class="font-label-md text-label-md text-on-surface mb-1">Step 3: Click "I Have Sent the Money"</p>
+                                    <p class="font-body-sm text-body-sm text-slate-gray mb-3">
+                                        Once you've sent the receipt, click the button below. Our admin team will verify the payment and credit your wallet. You'll receive an email notification once your account is credited.
+                                    </p>
+                                    <button @onclick="HandleTopup" disabled="@(_isLoading || _amount < 50000)" class="w-full bg-warm-gold text-paper-white font-label-md text-label-md uppercase py-3 px-6 rounded hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50">
+                                        @if (_isLoading)
+                                        {
+                                            <div class="w-4 h-4 border-2 border-paper-white border-t-transparent rounded-full animate-spin"></div>
+                                            <span>Submitting...</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="material-symbols-outlined text-[18px]">send</span>
+                                            <span>I Have Sent the Money</span>
+                                        }
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
         </div>
 
         <!-- Right: Summary -->
@@ -102,18 +155,18 @@
 
                 <div class="flex flex-col gap-4 mb-6 border-b border-outline-variant pb-6">
                     <div class="flex justify-between items-center">
-                        <span class="font-body-md text-body-md text-slate-gray">Funding Amount</span>
+                        <span class="font-body-md text-body-md text-slate-gray">Amount to Transfer</span>
                         <span class="font-label-md text-label-md text-deep-navy">&#8358;@_amount.ToString("N2")</span>
                     </div>
                     <div class="flex justify-between items-center">
-                        <span class="font-body-md text-body-sm text-slate-gray">Processing Fee (1.5%)</span>
-                        <span class="font-label-md text-label-md text-deep-navy">&#8358;@_processingFee.ToString("N2")</span>
+                        <span class="font-body-md text-body-sm text-slate-gray">Processing Fee</span>
+                        <span class="font-label-md text-label-md text-[#137333]">None — Bank Transfer</span>
                     </div>
                 </div>
 
                 <div class="flex justify-between items-end mb-8">
-                    <span class="font-label-sm text-label-sm text-deep-navy uppercase">Total to Pay</span>
-                    <span class="font-headline-lg text-headline-lg text-deep-navy font-bold tracking-tight">&#8358;@_total.ToString("N0")</span>
+                    <span class="font-label-sm text-label-sm text-deep-navy uppercase">Total to Transfer</span>
+                    <span class="font-headline-lg text-headline-lg text-deep-navy font-bold tracking-tight">&#8358;@_amount.ToString("N0")</span>
                 </div>
 
                 @if (!string.IsNullOrEmpty(_errorMessage))
@@ -121,23 +174,7 @@
                     <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 font-body-sm text-body-sm">@_errorMessage</div>
                 }
 
-                <button class="w-full bg-warm-gold text-paper-white py-4 rounded font-label-md text-label-md uppercase tracking-wider hover:bg-secondary transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                        disabled="@(_isLoading || _amount < 50000)" @onclick="HandleTopup">
-                    @if (_isLoading)
-                    {
-                        <span>Processing...</span>
-                    }
-                    else
-                    {
-                        <span>Proceed to Payment</span>
-                        <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
-                    }
-                </button>
 
-                <div class="mt-4 flex items-start gap-2 text-slate-gray">
-                    <span class="material-symbols-outlined text-[16px] mt-0.5">lock</span>
-                    <p class="font-body-sm text-body-sm text-[12px] leading-tight">Payments are securely processed. Your financial information is encrypted and never stored on our servers.</p>
-                </div>
             </div>
         </div>
     </div>
@@ -145,12 +182,8 @@
 
 @code {
     private decimal _amount = 100000;
-    private string _paymentMethod = "paystack";
     private bool _isLoading;
     private string? _errorMessage;
-
-    private decimal _processingFee => Math.Round(_amount * 0.015m, 2);
-    private decimal _total => _amount + _processingFee;
 
     private void SetAmount(decimal amount) => _amount = amount;
 
@@ -166,19 +199,17 @@
             var response = await Api.PostAsync<TopupInitiateResponse>("/v1/wallet/topup/initiate", new
             {
                 amount = _amount,
-                paymentProvider = _paymentMethod
+                paymentProvider = "manual"
             });
 
-            if (response?.AuthorizationUrl is not null)
+            if (response?.Reference is not null)
             {
-                // In production: redirect to payment gateway checkout
-                // For now, show success
-                _errorMessage = null;
-                // NavigationManager.NavigateTo(response.AuthorizationUrl);
+                _errorMessage = $"Top-up request submitted! Reference: {response.Reference}. Please transfer ₦{@_amount:N0} to our GTBank account (0000000000 — TruvoID Operations Ltd) and send the receipt to +234 800 000 0000 on WhatsApp. Click 'I Have Sent the Money' on the Dashboard when your account is credited.";
+                StateHasChanged();
             }
             else
             {
-                _errorMessage = "Failed to initiate payment. Please try again.";
+                _errorMessage = "Failed to initiate top-up. Please try again.";
             }
         }
         catch (Exception)

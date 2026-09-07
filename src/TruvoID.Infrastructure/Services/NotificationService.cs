@@ -13,6 +13,7 @@ public interface INotificationService
     Task SendStaffInvitationAsync(string toEmail, string institutionName, string inviterName, string role, string inviteToken, string baseUrl);
     Task CheckAndSendLowBalanceAlertAsync(Guid institutionId, decimal newBalance);
     Task SendVerificationResultAsync(Guid institutionId, string verificationType, string status, string callId, decimal cost);
+    Task SendAsync(string toEmail, string toName, string subject, string htmlBody);
 }
 
 public class NotificationService : INotificationService
@@ -177,6 +178,18 @@ public class NotificationService : INotificationService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to send verification result email for institution {InstitutionId}", institutionId);
+        }
+    }
+
+    public async Task SendAsync(string toEmail, string toName, string subject, string htmlBody)
+    {
+        try
+        {
+            await _email.SendAsync(toEmail, toName, subject, htmlBody);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send email to {Email}", toEmail);
         }
     }
 }

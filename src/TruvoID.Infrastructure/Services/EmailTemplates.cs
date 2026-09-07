@@ -303,6 +303,35 @@ public static class EmailTemplates
         </div>");
 
     // ══════════════════════════════════════════════════════════════════════════
+    // TOP-UP APPROVED
+    // ══════════════════════════════════════════════════════════════════════════
+
+    public static string TopUpApproved(string institutionName, decimal amount, string reference, decimal newBalance) =>
+        Wrap($"Wallet Credited — TruvoID",
+            $@"<div style=""text-align:center;margin-bottom:24px;"">
+          <div style=""display:inline-block;background:{SuccessBg};border:2px solid {SuccessGreen};border-radius:50%;width:72px;height:72px;line-height:72px;font-size:32px;"">✓</div>
+        </div>
+
+        <h1 style=""margin:0 0 8px;font-size:26px;font-weight:800;color:{Navy};text-align:center;letter-spacing:-0.5px;"" class=""email-heading"">Wallet Credited</h1>
+        <p style=""margin:0 0 32px;color:{SlateGray};font-size:15px;line-height:1.7;text-align:center;"" class=""email-body-text"">
+          Your wallet has been successfully credited. You can now perform verifications.
+        </p>
+
+        <div style=""background:{SurfaceLight};border:1px solid {BorderLight};border-radius:10px;margin:0 0 32px;"">
+          <table width=""100%"" cellpadding=""0"" cellspacing=""0"">
+            {KeyValueRow("Amount Credited", $"₦{amount:N2}", SuccessGreen)}
+            {KeyValueRow("Reference", $"<span style=\\\"font-family:monospace;font-size:13px;\\\">{reference}</span>")}
+            {KeyValueRow("New Balance", $"₦{newBalance:N2}", Navy, isLast: true)}
+          </table>
+        </div>
+
+        {CtaButton($"{AppBaseUrl}/dashboard", "Go to Dashboard →", SuccessGreen)}
+
+        <p style=""margin:0;color:{TextMuted};font-size:13px;line-height:1.7;"" class=""email-muted"">
+          Questions? Contact us at <a href=""mailto:support@truvoid.com"" style=""color:{Navy};font-weight:600;text-decoration:none;"">support@truvoid.com</a>
+        </p>");
+
+    // ══════════════════════════════════════════════════════════════════════════
     // VERIFICATION RESULT
     // ══════════════════════════════════════════════════════════════════════════
 
