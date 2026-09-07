@@ -146,12 +146,6 @@ public record PaginatedList<T>
     public int TotalPages => (int)Math.Ceiling((double)TotalCount / PageSize);
 }
 
-// ─── NIMC Config ───
-public record NimcEnvironmentDto
-{
-    public string ActiveEnvironment { get; init; } = "sandbox";
-}
-
 // ─── Admin Management ───
 public record AdminUserDto
 {
