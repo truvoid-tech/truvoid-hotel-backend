@@ -72,6 +72,7 @@ builder.Services.AddHttpClient("resend", client =>
 builder.Services.AddScoped<IPricingService, PricingService>();
 builder.Services.AddScoped<INimcConfigService, NimcConfigService>();
 builder.Services.AddScoped<NotificationFeedService>();
+builder.Services.AddScoped<NotificationPreferenceService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IWalletService, WalletService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
@@ -93,6 +94,28 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
+}
+else
+{
+    // Unhandled exceptions otherwise return an empty 500 body, which leaves
+    // both the frontend and Railway logs with nothing to go on. Log the full
+    // exception server-side and return a small JSON body the frontend can show.
+    app.UseExceptionHandler(errApp =>
+    {
+        errApp.Run(async ctx =>
+        {
+            var feature = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+            if (feature?.Error is { } ex)
+            {
+                ctx.RequestServices.GetRequiredService<ILogger<Program>>()
+                    .LogError(ex, "Unhandled exception on {Method} {Path}", ctx.Request.Method, ctx.Request.Path);
+            }
+
+            ctx.Response.ContentType = "application/json";
+            ctx.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            await ctx.Response.WriteAsJsonAsync(new { error = "An unexpected error occurred. Please try again." });
+        });
+    });
 }
 
 app.UseRouting();

@@ -58,7 +58,7 @@ public static class WalletEndpoints
 
     private static async Task<IResult> GetTransactions(
         HttpContext ctx,
-        WalletTransactionQuery query,
+        [AsParameters] WalletTransactionQuery query,
         MongoDbContext db)
     {
         var institutionId = ctx.GetInstitutionId();

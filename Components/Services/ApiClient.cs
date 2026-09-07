@@ -249,8 +249,12 @@ public class ApiClient
         {
             var content = await response.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(content);
+            if (doc.RootElement.TryGetProperty("error", out var err))
+                return err.GetString() ?? "An error occurred";
             if (doc.RootElement.TryGetProperty("message", out var msg))
                 return msg.GetString() ?? "An error occurred";
+            if (doc.RootElement.TryGetProperty("title", out var title))
+                return title.GetString() ?? "An error occurred";
         }
         catch { }
         return $"Request failed with status {response.StatusCode}";
