@@ -80,4 +80,31 @@ app.MapGet("/diag/api-check", async (HttpClient http) =>
     return Results.Json(result);
 });
 
+// TEMPORARY: exercises the exact same code path Login.razor uses (ApiClient →
+// CreateRequestAsync → TokenService → HttpClient), unlike /diag/api-check above
+// which calls HttpClient directly and skips ApiClient/TokenService entirely.
+app.MapGet("/diag/login-check", async (ApiClient api) =>
+{
+    var result = new Dictionary<string, object?>();
+    try
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var resp = await api.PostRawAsync("/v1/auth/login", new { email = "diag-frontend-check@example.com", password = "wrongpassword" });
+        sw.Stop();
+        var body = await resp.Content.ReadAsStringAsync();
+        result["elapsedMs"] = sw.ElapsedMilliseconds;
+        result["statusCode"] = (int)resp.StatusCode;
+        result["body"] = body.Length > 300 ? body[..300] : body;
+    }
+    catch (Exception ex)
+    {
+        result["exceptionType"] = ex.GetType().FullName;
+        result["message"] = ex.Message;
+        result["innerExceptionType"] = ex.InnerException?.GetType().FullName;
+        result["innerMessage"] = ex.InnerException?.Message;
+        result["stackTrace"] = ex.StackTrace;
+    }
+    return Results.Json(result);
+});
+
 app.Run();
