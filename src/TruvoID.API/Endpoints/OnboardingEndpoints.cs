@@ -165,7 +165,7 @@ public static class OnboardingEndpoints
             Email = newUser.Email,
             Role = role,
             Status = "PendingInvitation",
-            DailyCallLimit = newUser.DailyCallLimit,
+            DailyCallLimit = newUser.DailyCallLimit ?? 50,
             CreatedAt = newUser.CreatedAt
         });
     }

@@ -15,7 +15,7 @@ public class Institution
     public string Status { get; set; } = "Pending"; // Pending, Active, Suspended
     public string? Type { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; } = DateTime.UtcNow; // nullable: legacy documents store this as explicit null
 
     // ── Onboarding: business identity & KYC (step 2) ────────────────────────
     public string? LegalBusinessName { get; set; }

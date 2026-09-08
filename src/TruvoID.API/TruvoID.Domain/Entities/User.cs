@@ -18,7 +18,7 @@ public class User
     public string PasswordHash { get; set; } = string.Empty;
     public string Role { get; set; } = "Admin"; // Admin, Staff, ReadOnly
     public bool IsActive { get; set; } = true;
-    public int DailyCallLimit { get; set; } = 50;
+    public int? DailyCallLimit { get; set; } = 50; // nullable: legacy documents store this as explicit null
     public string? PasswordResetToken { get; set; }
     public DateTime? PasswordResetTokenExpiry { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
