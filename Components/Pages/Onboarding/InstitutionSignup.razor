@@ -6,6 +6,7 @@
 @inject TokenService TokenService
 @inject TruvoIDAuthStateProvider AuthState
 @inject NavigationManager Nav
+@inject ILogger<InstitutionSignup> Logger
 
 <PageTitle>TruvoID " Request Access</PageTitle>
 
@@ -152,6 +153,7 @@
     {
         _isLoading = true;
         _errorMessage = null;
+        Logger.LogInformation("[SIGNUP-DEBUG] HandleSignup started for {Email}", _model.AdminEmail);
 
         try
         {
@@ -161,6 +163,7 @@
             _model.ContactPhone = _model.AdminPhone;
 
             var raw = await Api.PostRawAsync("/v1/auth/register", _model);
+            Logger.LogInformation("[SIGNUP-DEBUG] Got response {StatusCode}", raw.StatusCode);
 
             if (raw.StatusCode == System.Net.HttpStatusCode.Conflict)
             {
@@ -180,20 +183,24 @@
             var response = await raw.Content.ReadFromJsonAsync<RegisterResponse>(_jsonOptions);
             if (response is null || string.IsNullOrEmpty(response.AccessToken))
             {
+                Logger.LogWarning("[SIGNUP-DEBUG] Response body missing/empty AccessToken");
                 _errorMessage = "Registration failed. Please try again.";
                 return;
             }
 
+            Logger.LogInformation("[SIGNUP-DEBUG] Got token, storing and navigating to /onboarding/business");
             await TokenService.SetTokensAsync(response.AccessToken, response.RefreshToken, response.ExpiresAt);
             AuthState.NotifyAuthenticationStateChanged();
             Nav.NavigateTo("/onboarding/business", forceLoad: true);
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+            Logger.LogError(ex, "[SIGNUP-DEBUG] HttpRequestException: {Message} | Inner: {Inner}", ex.Message, ex.InnerException?.Message);
             _errorMessage = "Unable to connect. Please try again.";
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Logger.LogError(ex, "[SIGNUP-DEBUG] {ExType}: {Message} | Inner: {Inner}", ex.GetType().Name, ex.Message, ex.InnerException?.Message);
             _errorMessage = "An unexpected error occurred.";
         }
         finally
