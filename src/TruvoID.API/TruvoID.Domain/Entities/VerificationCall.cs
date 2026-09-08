@@ -4,6 +4,7 @@ using TruvoID.Domain.Enums;
 
 namespace TruvoID.Domain.Entities;
 
+[BsonIgnoreExtraElements]
 public class VerificationCall
 {
     [BsonId]

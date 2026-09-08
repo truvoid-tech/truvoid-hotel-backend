@@ -7,6 +7,7 @@ namespace TruvoID.Domain.Entities;
 /// Per-institution verification pricing. Each institution can have custom rates.
 /// If no record exists for an institution, global defaults apply.
 /// </summary>
+[BsonIgnoreExtraElements]
 public class InstitutionPricing
 {
     [BsonId]

@@ -100,12 +100,16 @@ public static class AuthEndpoints
         if (!user.IsActive)
             return Results.Forbid();
 
-        var institution = await db.Institutions
-            .Find(i => i.Id == user.InstitutionId)
-            .FirstOrDefaultAsync();
+        // Platform-level accounts (e.g. PlatformAdmin) aren't scoped to an institution.
+        if (user.InstitutionId != Guid.Empty)
+        {
+            var institution = await db.Institutions
+                .Find(i => i.Id == user.InstitutionId)
+                .FirstOrDefaultAsync();
 
-        if (institution is null)
-            return Results.NotFound(new { error = "Institution not found." });
+            if (institution is null)
+                return Results.NotFound(new { error = "Institution not found." });
+        }
 
         var (accessToken, refreshToken, expiresAt) = GenerateTokens(user.InstitutionId, user.Id, user.Role);
 
@@ -121,10 +125,12 @@ public static class AuthEndpoints
         RefreshTokenRequest request,
         MongoDbContext db)
     {
-        // Validate the old access token and issue new tokens
+        // Validate the old access token and issue new tokens.
+        // institutionId == Guid.Empty is valid for platform-level accounts — only a
+        // missing/invalid userId means the token itself didn't parse.
         var (userId, institutionId, role) = GetClaimsFromToken(request.OldAccessToken);
 
-        if (userId == Guid.Empty || institutionId == Guid.Empty)
+        if (userId == Guid.Empty)
             return Results.Unauthorized();
 
         var user = await db.Users.Find(u => u.Id == userId).FirstOrDefaultAsync();
@@ -153,16 +159,22 @@ public static class AuthEndpoints
         var token = authHeader["Bearer ".Length..].Trim();
         var (userId, institutionId, _) = GetClaimsFromToken(token);
 
-        if (userId == Guid.Empty || institutionId == Guid.Empty)
+        if (userId == Guid.Empty)
             return Results.Unauthorized();
 
         var user = await db.Users.Find(u => u.Id == userId).FirstOrDefaultAsync();
         if (user is null)
             return Results.Unauthorized();
 
-        var institution = await db.Institutions.Find(i => i.Id == institutionId).FirstOrDefaultAsync();
-        if (institution is null)
-            return Results.NotFound(new { error = "Institution not found." });
+        // Platform-level accounts (e.g. PlatformAdmin) aren't scoped to an institution.
+        var institutionName = string.Empty;
+        if (institutionId != Guid.Empty)
+        {
+            var institution = await db.Institutions.Find(i => i.Id == institutionId).FirstOrDefaultAsync();
+            if (institution is null)
+                return Results.NotFound(new { error = "Institution not found." });
+            institutionName = institution.Name;
+        }
 
         return Results.Ok(new AuthProfileResponse
         {
@@ -171,7 +183,7 @@ public static class AuthEndpoints
             Email = user.Email,
             FullName = user.FullName ?? string.Empty,
             Role = user.Role,
-            InstitutionName = institution.Name
+            InstitutionName = institutionName
         });
     }
 

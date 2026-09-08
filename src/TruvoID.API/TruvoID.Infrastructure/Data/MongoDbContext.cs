@@ -1,3 +1,4 @@
+using MongoDB.Bson.Serialization.Attributes;
 using MongoDB.Driver;
 using TruvoID.Domain.Entities;
 
@@ -5,6 +6,7 @@ namespace TruvoID.Infrastructure.Data;
 
 // ── Wallet entities (used by WalletEndpoints) ──────────────────────────────
 
+[BsonIgnoreExtraElements]
 public class WalletLedger
 {
     public Guid Id { get; set; }
@@ -18,6 +20,7 @@ public class WalletLedger
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
+[BsonIgnoreExtraElements]
 public class WalletTopUp
 {
     public Guid Id { get; set; }

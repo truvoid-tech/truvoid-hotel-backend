@@ -3,6 +3,10 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace TruvoID.Domain.Entities;
 
+// Older documents can carry fields this class no longer defines (e.g. a legacy
+// PhoneNumber column) — without this, the driver throws on any doc with an
+// unmapped element instead of just ignoring it.
+[BsonIgnoreExtraElements]
 public class User
 {
     [BsonId]

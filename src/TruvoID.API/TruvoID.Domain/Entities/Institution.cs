@@ -3,6 +3,7 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace TruvoID.Domain.Entities;
 
+[BsonIgnoreExtraElements]
 public class Institution
 {
     [BsonId]

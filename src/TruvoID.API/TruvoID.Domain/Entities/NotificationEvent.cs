@@ -6,6 +6,7 @@ namespace TruvoID.Domain.Entities;
 /// <summary>
 /// In-app notification event. Each row is one notification shown to an institution.
 /// </summary>
+[BsonIgnoreExtraElements]
 public class NotificationEvent
 {
     [BsonId]
