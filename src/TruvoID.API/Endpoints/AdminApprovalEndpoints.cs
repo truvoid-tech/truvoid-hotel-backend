@@ -20,6 +20,10 @@ public static class AdminApprovalEndpoints
         app.MapPost("/v1/admin/institutions/{id:guid}/suspend", SuspendInstitution)
             .RequireAuthorization("TruvoAdmin");
 
+        // Reactivate institution (Suspended → Active)
+        app.MapPost("/v1/admin/institutions/{id:guid}/reactivate", ReactivateInstitution)
+            .RequireAuthorization("TruvoAdmin");
+
         return app;
     }
 
@@ -74,5 +78,24 @@ public static class AdminApprovalEndpoints
         await db.Institutions.UpdateOneAsync(i => i.Id == id, update);
 
         return Results.Ok(new { message = $"{institution.Name} has been suspended." });
+    }
+
+    private static async Task<IResult> ReactivateInstitution(
+        Guid id,
+        MongoDbContext db)
+    {
+        var institution = await db.Institutions
+            .Find(i => i.Id == id)
+            .FirstOrDefaultAsync();
+
+        if (institution is null)
+            return Results.NotFound(new { error = "Institution not found." });
+
+        var update = Builders<Institution>.Update
+            .Set(i => i.Status, "Active")
+            .Set(i => i.UpdatedAt, DateTime.UtcNow);
+        await db.Institutions.UpdateOneAsync(i => i.Id == id, update);
+
+        return Results.Ok(new { message = $"{institution.Name} has been reactivated." });
     }
 }
