@@ -21,11 +21,46 @@ public static class AdminDashboardEndpoints
         group.MapPost("/admins/invite", InviteAdmin);
         group.MapPut("/admins/{userId:guid}/role", UpdateAdminRole);
 
-        // API Keys don't exist as a real feature yet (no entity/storage/auth path) —
-        // return an empty list so the audit page loads cleanly instead of 404ing.
-        group.MapGet("/api-keys", () => Results.Ok(new List<AdminApiKeyDto>()));
+        group.MapGet("/api-keys", GetAllApiKeys);
+        group.MapPost("/api-keys/{id:guid}/revoke", RevokeApiKey);
 
         return app;
+    }
+
+    private static async Task<IResult> GetAllApiKeys(MongoDbContext db)
+    {
+        var keys = await db.ApiKeys.Find(FilterDefinition<ApiKey>.Empty)
+            .SortByDescending(k => k.CreatedAt)
+            .ToListAsync();
+        var institutions = await db.Institutions.Find(FilterDefinition<Institution>.Empty).ToListAsync();
+        var institutionNames = institutions.ToDictionary(i => i.Id, i => i.Name);
+
+        var result = keys.Select(k => new AdminApiKeyDto
+        {
+            Id = k.Id,
+            InstitutionName = institutionNames.GetValueOrDefault(k.InstitutionId, "Unknown"),
+            KeyPrefix = k.KeyPrefix,
+            Description = k.Description,
+            Status = k.Status,
+            CallCount = k.CallCount,
+            CreatedAt = k.CreatedAt,
+            LastUsedAt = k.LastUsedAt
+        }).ToList();
+
+        return Results.Ok(result);
+    }
+
+    private static async Task<IResult> RevokeApiKey(Guid id, MongoDbContext db)
+    {
+        var update = Builders<ApiKey>.Update
+            .Set(k => k.Status, "Revoked")
+            .Set(k => k.RevokedAt, DateTime.UtcNow);
+        var result = await db.ApiKeys.UpdateOneAsync(k => k.Id == id, update);
+
+        if (result.MatchedCount == 0)
+            return Results.NotFound(new { error = "API key not found." });
+
+        return Results.Ok(new { message = "API key revoked." });
     }
 
     private static async Task<IResult> GetOverview(MongoDbContext db)

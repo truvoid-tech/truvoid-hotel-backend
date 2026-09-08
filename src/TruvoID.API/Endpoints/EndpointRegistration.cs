@@ -18,6 +18,7 @@ public static class EndpointRegistration
         app.MapOnboardingEndpoints();
         app.MapVerificationEndpoints();
         app.MapAdminDashboardEndpoints();
+        app.MapApiKeyEndpoints();
 
         return app;
     }

@@ -25,4 +25,11 @@ public static class HttpContextExtensions
 
         return id;
     }
+
+    /// <summary>Set only when the request authenticated via an X-API-Key header rather than a JWT.</summary>
+    public static Guid? GetApiKeyId(this HttpContext ctx)
+    {
+        var claim = ctx.User.FindFirst("api_key_id");
+        return claim is not null && Guid.TryParse(claim.Value, out var id) ? id : null;
+    }
 }

@@ -16,6 +16,7 @@ public static class OnboardingEndpoints
     {
         var group = app.MapGroup("/v1/onboarding").RequireAuthorization();
 
+        group.MapGet("/status", GetStatus);
         group.MapPut("/institution", UpdateInstitutionName);
         group.MapPut("/business", UpdateBusinessProfile);
         group.MapPost("/compliance", AcceptCompliance);
@@ -23,6 +24,29 @@ public static class OnboardingEndpoints
         group.MapPost("/complete", CompleteOnboarding);
 
         return app;
+    }
+
+    private static async Task<IResult> GetStatus(
+        HttpContext ctx,
+        MongoDbContext db)
+    {
+        var institutionId = ctx.GetInstitutionId();
+        if (institutionId == Guid.Empty) return Results.Unauthorized();
+
+        var institution = await db.Institutions.Find(i => i.Id == institutionId).FirstOrDefaultAsync();
+        if (institution is null)
+            return Results.NotFound(new { error = "Institution not found." });
+
+        return Results.Ok(new OnboardingStatusResponse
+        {
+            Institution = new InstitutionInfo
+            {
+                Name = institution.Name,
+                ContactEmail = institution.ContactEmail ?? "",
+                ContactPhone = institution.ContactPhone ?? ""
+            },
+            IsComplete = institution.OnboardingComplete
+        });
     }
 
     private static async Task<IResult> UpdateInstitutionName(
@@ -39,12 +63,21 @@ public static class OnboardingEndpoints
         var update = Builders<Institution>.Update
             .Set(i => i.Name, request.Name.Trim())
             .Set(i => i.UpdatedAt, DateTime.UtcNow);
+
+        // Settings' profile tab also submits contact email/phone; the onboarding
+        // step-3 admin-name-edit form only ever sends Name, so these stay untouched
+        // when absent rather than being blanked out.
+        if (!string.IsNullOrWhiteSpace(request.ContactEmail))
+            update = update.Set(i => i.ContactEmail, request.ContactEmail.Trim());
+        if (!string.IsNullOrWhiteSpace(request.ContactPhone))
+            update = update.Set(i => i.ContactPhone, request.ContactPhone.Trim());
+
         var result = await db.Institutions.UpdateOneAsync(i => i.Id == institutionId, update);
 
         if (result.MatchedCount == 0)
             return Results.NotFound(new { error = "Institution not found." });
 
-        return Results.Ok(new { message = "Institution name updated." });
+        return Results.Ok(new { message = "Institution updated." });
     }
 
     private static async Task<IResult> UpdateBusinessProfile(
@@ -186,7 +219,12 @@ public static class OnboardingEndpoints
         return Results.Ok(new { message = "Onboarding complete." });
     }
 
-    public record UpdateInstitutionNameRequest(string Name);
+    public record UpdateInstitutionNameRequest
+    {
+        public string Name { get; init; } = "";
+        public string? ContactEmail { get; init; }
+        public string? ContactPhone { get; init; }
+    }
 
     public record BusinessProfileRequest
     {
@@ -208,6 +246,19 @@ public static class OnboardingEndpoints
         public int Role { get; init; }
         public int DailyCallLimit { get; init; } = 50;
     }
+}
+
+public class OnboardingStatusResponse
+{
+    public InstitutionInfo? Institution { get; init; }
+    public bool IsComplete { get; init; }
+}
+
+public class InstitutionInfo
+{
+    public string Name { get; init; } = "";
+    public string ContactEmail { get; init; } = "";
+    public string ContactPhone { get; init; } = "";
 }
 
 public class StaffInviteResponse

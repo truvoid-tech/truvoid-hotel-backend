@@ -11,6 +11,7 @@
     <Compile Include="Program.cs" />
     <!-- Endpoint files live here -->
     <Compile Include="Endpoints/**/*.cs" />
+    <Compile Include="Auth/**/*.cs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -30,7 +30,62 @@ public static class AuthEndpoints
         authGroup.MapGet("/me", GetCurrentUser)
             .RequireAuthorization();
 
+        authGroup.MapPost("/change-password", ChangePassword)
+            .RequireAuthorization();
+
+        authGroup.MapPost("/deactivate", DeactivateAccount)
+            .RequireAuthorization();
+
+        // JWTs are stateless here (no server-side session/token blocklist), so
+        // there's nothing to actually invalidate — this exists so the frontend's
+        // logout call has something to hit instead of a 404.
+        authGroup.MapGet("/logout", () => Results.Ok(new { message = "Logged out." }))
+            .RequireAuthorization();
+
         return app;
+    }
+
+    private static async Task<IResult> ChangePassword(
+        HttpContext ctx,
+        ChangePasswordRequest request,
+        MongoDbContext db)
+    {
+        var userId = ctx.GetUserId();
+        if (userId == Guid.Empty) return Results.Unauthorized();
+
+        if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 8)
+            return Results.BadRequest(new { error = "New password must be at least 8 characters." });
+
+        var user = await db.Users.Find(u => u.Id == userId).FirstOrDefaultAsync();
+        if (user is null) return Results.Unauthorized();
+
+        if (user.PasswordHash != HashPassword(request.CurrentPassword))
+            return Results.BadRequest(new { error = "Current password is incorrect." });
+
+        var update = Builders<User>.Update
+            .Set(u => u.PasswordHash, HashPassword(request.NewPassword))
+            .Set(u => u.UpdatedAt, DateTime.UtcNow);
+        await db.Users.UpdateOneAsync(u => u.Id == userId, update);
+
+        return Results.Ok(new { message = "Password changed successfully." });
+    }
+
+    private static async Task<IResult> DeactivateAccount(
+        HttpContext ctx,
+        MongoDbContext db)
+    {
+        var institutionId = ctx.GetInstitutionId();
+        if (institutionId == Guid.Empty) return Results.Unauthorized();
+
+        var update = Builders<Institution>.Update
+            .Set(i => i.Status, "Suspended")
+            .Set(i => i.UpdatedAt, DateTime.UtcNow);
+        var result = await db.Institutions.UpdateOneAsync(i => i.Id == institutionId, update);
+
+        if (result.MatchedCount == 0)
+            return Results.NotFound(new { error = "Institution not found." });
+
+        return Results.Ok(new { message = "Account deactivated." });
     }
 
     private static async Task<IResult> Register(
@@ -323,6 +378,12 @@ public static class AuthEndpoints
     {
         public string OldAccessToken { get; init; } = "";
         public string RefreshToken { get; init; } = "";
+    }
+
+    public record ChangePasswordRequest
+    {
+        public string CurrentPassword { get; init; } = "";
+        public string NewPassword { get; init; } = "";
     }
 }
 

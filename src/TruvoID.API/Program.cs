@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using TruvoID.API.Auth;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Serializers;
@@ -63,7 +65,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = jwtAudience,
             ClockSkew = TimeSpan.Zero
         };
-    });
+    })
+    // Lets /v1/verify/* accept an institution's own API key (X-API-Key header) as
+    // an alternative to a JWT — see ApiKeyAuthenticationHandler.
+    .AddScheme<AuthenticationSchemeOptions, ApiKeyAuthenticationHandler>(ApiKeyAuthenticationHandler.SchemeName, null);
 
 builder.Services.AddAuthorization(options =>
 {

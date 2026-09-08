@@ -69,4 +69,7 @@ public class MongoDbContext
 
     public IMongoCollection<WalletTopUp> WalletTopUps =>
         _database.GetCollection<WalletTopUp>("wallet_topups");
+
+    public IMongoCollection<ApiKey> ApiKeys =>
+        _database.GetCollection<ApiKey>("api_keys");
 }

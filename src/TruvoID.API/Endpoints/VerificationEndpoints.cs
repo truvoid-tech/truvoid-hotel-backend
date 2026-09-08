@@ -1,7 +1,9 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using MongoDB.Driver;
+using TruvoID.API.Auth;
 using TruvoID.Core.DTOs;
 using TruvoID.Core.Interfaces;
 using TruvoID.Domain.Enums;
@@ -19,7 +21,13 @@ public static class VerificationEndpoints
 
     public static IEndpointRouteBuilder MapVerificationEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/v1/verify").RequireAuthorization();
+        // Accept either a dashboard JWT or an institution's own X-API-Key header —
+        // programmatic integrations use the latter, the "Try Test Verification"
+        // sandbox page uses the former.
+        var group = app.MapGroup("/v1/verify")
+            .RequireAuthorization(policy => policy
+                .AddAuthenticationSchemes(JwtBearerDefaults.AuthenticationScheme, ApiKeyAuthenticationHandler.SchemeName)
+                .RequireAuthenticatedUser());
 
         group.MapPost("/nin", VerifyNin);
         group.MapPost("/bvn", VerifyBvn);
@@ -61,7 +69,7 @@ public static class VerificationEndpoints
         }
 
         var response = await verification.VerifyAsync(
-            institutionId, VerificationType.Nin, request.Nin ?? "", ctx.GetUserId(), ct: ct);
+            institutionId, VerificationType.Nin, request.Nin ?? "", ctx.GetUserId(), ctx.GetApiKeyId(), ct: ct);
         return Results.Ok(response);
     }
 
@@ -75,7 +83,7 @@ public static class VerificationEndpoints
         if (institutionId == Guid.Empty) return Results.Unauthorized();
 
         var response = await verification.VerifyAsync(
-            institutionId, VerificationType.Bvn, request.Bvn ?? "", ctx.GetUserId(), ct: ct);
+            institutionId, VerificationType.Bvn, request.Bvn ?? "", ctx.GetUserId(), ctx.GetApiKeyId(), ct: ct);
         return Results.Ok(response);
     }
 
@@ -89,7 +97,7 @@ public static class VerificationEndpoints
         if (institutionId == Guid.Empty) return Results.Unauthorized();
 
         var response = await verification.VerifyAsync(
-            institutionId, VerificationType.Phone, request.PhoneNumber ?? "", ctx.GetUserId(), ct: ct);
+            institutionId, VerificationType.Phone, request.PhoneNumber ?? "", ctx.GetUserId(), ctx.GetApiKeyId(), ct: ct);
         return Results.Ok(response);
     }
 
