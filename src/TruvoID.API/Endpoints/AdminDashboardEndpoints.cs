@@ -24,7 +24,45 @@ public static class AdminDashboardEndpoints
         group.MapGet("/api-keys", GetAllApiKeys);
         group.MapPost("/api-keys/{id:guid}/revoke", RevokeApiKey);
 
+        group.MapGet("/audit", GetAuditLog);
+
         return app;
+    }
+
+    private static async Task<IResult> GetAuditLog(
+        int page,
+        int pageSize,
+        MongoDbContext db)
+    {
+        page = page < 1 ? 1 : page;
+        pageSize = pageSize is < 1 or > 200 ? 50 : pageSize;
+
+        var entries = await db.AuditLogs
+            .Find(FilterDefinition<AuditLogEntry>.Empty)
+            .SortByDescending(e => e.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Limit(pageSize)
+            .ToListAsync();
+
+        var actorIds = entries.Where(e => e.ActorId.HasValue).Select(e => e.ActorId!.Value).Distinct().ToList();
+        var actors = actorIds.Count == 0
+            ? new List<User>()
+            : await db.Users.Find(u => actorIds.Contains(u.Id)).ToListAsync();
+        var actorEmails = actors.ToDictionary(u => u.Id, u => u.Email);
+
+        var result = entries.Select(e => new AuditLogEntryDto
+        {
+            Id = e.Id,
+            ActorEmail = e.ActorId.HasValue ? actorEmails.GetValueOrDefault(e.ActorId.Value) : null,
+            ActorType = e.ActorType ?? "System",
+            Action = e.Action.ToString(),
+            Entity = e.Entity,
+            EntityId = e.EntityId,
+            DetailsJson = e.DetailsJson,
+            CreatedAt = e.CreatedAt
+        }).ToList();
+
+        return Results.Ok(result);
     }
 
     private static async Task<IResult> GetAllApiKeys(MongoDbContext db)
@@ -50,7 +88,7 @@ public static class AdminDashboardEndpoints
         return Results.Ok(result);
     }
 
-    private static async Task<IResult> RevokeApiKey(Guid id, MongoDbContext db)
+    private static async Task<IResult> RevokeApiKey(Guid id, HttpContext ctx, MongoDbContext db, Core.Interfaces.IAuditService audit)
     {
         var update = Builders<ApiKey>.Update
             .Set(k => k.Status, "Revoked")
@@ -59,6 +97,8 @@ public static class AdminDashboardEndpoints
 
         if (result.MatchedCount == 0)
             return Results.NotFound(new { error = "API key not found." });
+
+        await audit.LogAsync(AuditAction.ApiKeyRevoked, nameof(ApiKey), id, ctx.GetUserId(), "User", "Revoked by platform admin");
 
         return Results.Ok(new { message = "API key revoked." });
     }
@@ -185,8 +225,10 @@ public static class AdminDashboardEndpoints
     }
 
     private static async Task<IResult> InviteAdmin(
+        HttpContext ctx,
         InviteAdminRequest request,
-        MongoDbContext db)
+        MongoDbContext db,
+        Core.Interfaces.IAuditService audit)
     {
         if (string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.FullName) || string.IsNullOrWhiteSpace(request.Password))
             return Results.BadRequest(new { error = "Email, full name, and password are required." });
@@ -208,14 +250,17 @@ public static class AdminDashboardEndpoints
             CreatedAt = DateTime.UtcNow
         };
         await db.Users.InsertOneAsync(newAdmin);
+        await audit.LogAsync(AuditAction.Created, nameof(User), newAdmin.Id, ctx.GetUserId(), "User", $"Invited platform admin: {email}");
 
         return Results.Ok(new { message = "Platform admin invited." });
     }
 
     private static async Task<IResult> UpdateAdminRole(
         Guid userId,
+        HttpContext ctx,
         UpdateRoleRequest request,
-        MongoDbContext db)
+        MongoDbContext db,
+        Core.Interfaces.IAuditService audit)
     {
         if (request.Role != "Admin" && request.Role != "Staff")
             return Results.BadRequest(new { error = "Role must be 'Admin' or 'Staff'." });
@@ -231,6 +276,7 @@ public static class AdminDashboardEndpoints
             .Set(u => u.Role, request.Role)
             .Set(u => u.UpdatedAt, DateTime.UtcNow);
         await db.Users.UpdateOneAsync(u => u.Id == userId, update);
+        await audit.LogAsync(AuditAction.RoleChanged, nameof(User), userId, ctx.GetUserId(), "User", $"{user.Role} → {request.Role}");
 
         return Results.Ok(new { message = "Role updated." });
     }

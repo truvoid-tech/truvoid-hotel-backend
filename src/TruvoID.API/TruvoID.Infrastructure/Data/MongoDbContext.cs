@@ -72,4 +72,7 @@ public class MongoDbContext
 
     public IMongoCollection<ApiKey> ApiKeys =>
         _database.GetCollection<ApiKey>("api_keys");
+
+    public IMongoCollection<AuditLogEntry> AuditLogs =>
+        _database.GetCollection<AuditLogEntry>("audit_logs");
 }

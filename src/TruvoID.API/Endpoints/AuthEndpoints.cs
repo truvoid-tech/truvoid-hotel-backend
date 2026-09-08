@@ -7,7 +7,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
+using TruvoID.Core.Interfaces;
 using TruvoID.Domain.Entities;
+using TruvoID.Domain.Enums;
 using TruvoID.Infrastructure.Data;
 
 namespace TruvoID.API.Endpoints;
@@ -162,7 +164,8 @@ public static class AuthEndpoints
 
     private static async Task<IResult> Login(
         LoginRequest request,
-        MongoDbContext db)
+        MongoDbContext db,
+        IAuditService audit)
     {
         var user = await db.Users
             .Find(u => u.Email == request.Email && u.PasswordHash == HashPassword(request.Password))
@@ -184,6 +187,11 @@ public static class AuthEndpoints
             if (institution is null)
                 return Results.NotFound(new { error = "Institution not found." });
         }
+
+        var now = DateTime.UtcNow;
+        await db.Users.UpdateOneAsync(u => u.Id == user.Id,
+            Builders<User>.Update.Set(u => u.LastLoginAt, now));
+        await audit.LogAsync(AuditAction.Login, nameof(User), user.Id, user.Id, "User");
 
         var (accessToken, refreshToken, expiresAt) = GenerateTokens(user.InstitutionId, user.Id, user.Role);
 

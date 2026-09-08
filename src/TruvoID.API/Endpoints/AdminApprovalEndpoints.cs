@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using MongoDB.Driver;
+using TruvoID.Core.Interfaces;
 using TruvoID.Domain.Entities;
+using TruvoID.Domain.Enums;
 using TruvoID.Infrastructure.Data;
 using TruvoID.Infrastructure.Services;
 
@@ -29,8 +31,10 @@ public static class AdminApprovalEndpoints
 
     private static async Task<IResult> ApproveInstitution(
         Guid id,
+        HttpContext ctx,
         MongoDbContext db,
-        INotificationService notifications)
+        INotificationService notifications,
+        IAuditService audit)
     {
         var institution = await db.Institutions
             .Find(i => i.Id == id)
@@ -46,6 +50,7 @@ public static class AdminApprovalEndpoints
             .Set(i => i.Status, "Active")
             .Set(i => i.UpdatedAt, DateTime.UtcNow);
         await db.Institutions.UpdateOneAsync(i => i.Id == id, update);
+        await audit.LogAsync(AuditAction.Updated, nameof(Institution), id, ctx.GetUserId(), "User", $"Approved: {institution.Name}");
 
         // Find the admin user to send the approval email to
         var adminUser = await db.Users
@@ -63,7 +68,9 @@ public static class AdminApprovalEndpoints
 
     private static async Task<IResult> SuspendInstitution(
         Guid id,
-        MongoDbContext db)
+        HttpContext ctx,
+        MongoDbContext db,
+        IAuditService audit)
     {
         var institution = await db.Institutions
             .Find(i => i.Id == id)
@@ -76,13 +83,16 @@ public static class AdminApprovalEndpoints
             .Set(i => i.Status, "Suspended")
             .Set(i => i.UpdatedAt, DateTime.UtcNow);
         await db.Institutions.UpdateOneAsync(i => i.Id == id, update);
+        await audit.LogAsync(AuditAction.Updated, nameof(Institution), id, ctx.GetUserId(), "User", $"Suspended: {institution.Name}");
 
         return Results.Ok(new { message = $"{institution.Name} has been suspended." });
     }
 
     private static async Task<IResult> ReactivateInstitution(
         Guid id,
-        MongoDbContext db)
+        HttpContext ctx,
+        MongoDbContext db,
+        IAuditService audit)
     {
         var institution = await db.Institutions
             .Find(i => i.Id == id)
@@ -95,6 +105,7 @@ public static class AdminApprovalEndpoints
             .Set(i => i.Status, "Active")
             .Set(i => i.UpdatedAt, DateTime.UtcNow);
         await db.Institutions.UpdateOneAsync(i => i.Id == id, update);
+        await audit.LogAsync(AuditAction.Updated, nameof(Institution), id, ctx.GetUserId(), "User", $"Reactivated: {institution.Name}");
 
         return Results.Ok(new { message = $"{institution.Name} has been reactivated." });
     }

@@ -126,10 +126,12 @@ public static class WalletEndpoints
 
     private static async Task<IResult> CreditWallet(
         Guid institutionId,
+        HttpContext ctx,
         CreditWalletRequest request,
         MongoDbContext db,
         INotificationService notifications,
-        NotificationFeedService feed)
+        NotificationFeedService feed,
+        TruvoID.Core.Interfaces.IAuditService audit)
     {
         var institution = await db.Institutions.Find(i => i.Id == institutionId).FirstOrDefaultAsync();
         if (institution is null)
@@ -162,12 +164,8 @@ public static class WalletEndpoints
         };
 
         await db.WalletLedgers.InsertOneAsync(ledgerEntry);
-
-        // Update institution wallet balance in the institutions collection too
-        // (used for admin dashboard display)
-        var updateInst = Builders<Institution>.Update
-            .Set(i => i.UpdatedAt, DateTime.UtcNow);
-        // We don't store balance on Institution entity; read from ledger instead
+        await audit.LogAsync(TruvoID.Domain.Enums.AuditAction.WalletCredited, nameof(Institution), institutionId,
+            ctx.GetUserId(), "User", $"₦{request.Amount:N2} — {ledgerEntry.Description}");
 
         // Send credit notification
         if (!string.IsNullOrWhiteSpace(institution.ContactEmail))
@@ -192,9 +190,11 @@ public static class WalletEndpoints
 
     private static async Task<IResult> ApproveTopUp(
         Guid topupId,
+        HttpContext ctx,
         MongoDbContext db,
         INotificationService notifications,
-        NotificationFeedService feed)
+        NotificationFeedService feed,
+        TruvoID.Core.Interfaces.IAuditService audit)
     {
         var topup = await db.WalletTopUps.Find(t => t.Id == topupId).FirstOrDefaultAsync();
         if (topup is null)
@@ -240,6 +240,8 @@ public static class WalletEndpoints
             Builders<WalletTopUp>.Update
                 .Set(t => t.Status, "Approved")
                 .Set(t => t.ApprovedAt, DateTime.UtcNow));
+        await audit.LogAsync(TruvoID.Domain.Enums.AuditAction.WalletCredited, nameof(Institution), topup.InstitutionId,
+            ctx.GetUserId(), "User", $"Top-up approved: ₦{topup.Amount:N2} ({topup.Reference})");
 
         // Send credit notification email + in-app notification
         if (!string.IsNullOrWhiteSpace(institution.ContactEmail))

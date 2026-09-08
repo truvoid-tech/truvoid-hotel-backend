@@ -4,7 +4,9 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using MongoDB.Driver;
+using TruvoID.Core.Interfaces;
 using TruvoID.Domain.Entities;
+using TruvoID.Domain.Enums;
 using TruvoID.Infrastructure.Data;
 
 namespace TruvoID.API.Endpoints;
@@ -42,7 +44,8 @@ public static class ApiKeyEndpoints
     private static async Task<IResult> CreateKey(
         HttpContext ctx,
         CreateApiKeyRequest request,
-        MongoDbContext db)
+        MongoDbContext db,
+        IAuditService audit)
     {
         var institutionId = ctx.GetInstitutionId();
         if (institutionId == Guid.Empty) return Results.Unauthorized();
@@ -62,6 +65,7 @@ public static class ApiKeyEndpoints
             CreatedAt = DateTime.UtcNow
         };
         await db.ApiKeys.InsertOneAsync(key);
+        await audit.LogAsync(AuditAction.ApiKeyGenerated, nameof(ApiKey), key.Id, ctx.GetUserId(), "User", key.Description);
 
         return Results.Ok(MapResponse(key, rawKey));
     }
@@ -69,7 +73,8 @@ public static class ApiKeyEndpoints
     private static async Task<IResult> RevokeKey(
         HttpContext ctx,
         Guid id,
-        MongoDbContext db)
+        MongoDbContext db,
+        IAuditService audit)
     {
         var institutionId = ctx.GetInstitutionId();
         if (institutionId == Guid.Empty) return Results.Unauthorized();
@@ -84,6 +89,8 @@ public static class ApiKeyEndpoints
 
         if (result.MatchedCount == 0)
             return Results.NotFound(new { error = "API key not found." });
+
+        await audit.LogAsync(AuditAction.ApiKeyRevoked, nameof(ApiKey), id, ctx.GetUserId(), "User");
 
         return Results.NoContent();
     }
