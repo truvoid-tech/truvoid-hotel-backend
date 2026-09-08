@@ -261,18 +261,19 @@ public static class AuthEndpoints
                 ClockSkew = TimeSpan.Zero
             };
 
-            var principal = tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
+            _ = tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
             var jwtToken = (JwtSecurityToken)validatedToken;
 
-            var userId = jwtToken.Claims.Any(c => c.Type == JwtRegisteredClaimNames.Sub)
-                ? Guid.Parse(principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value ?? Guid.Empty.ToString())
-                : Guid.Empty;
+            // Read from the raw token claims, not the ClaimsPrincipal — JwtSecurityTokenHandler
+            // silently remaps short claim names like "sub" to long URIs (e.g. ClaimTypes.NameIdentifier)
+            // by default, so principal.FindFirst("sub") returns null even though the token has it.
+            var userIdClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Sub)?.Value;
+            var userId = Guid.TryParse(userIdClaim, out var uid) ? uid : Guid.Empty;
 
-            var institutionId = jwtToken.Claims.Any(c => c.Type == "institution_id")
-                ? Guid.Parse(principal.FindFirst("institution_id")?.Value ?? Guid.Empty.ToString())
-                : Guid.Empty;
+            var institutionIdClaim = jwtToken.Claims.FirstOrDefault(c => c.Type == "institution_id")?.Value;
+            var institutionId = Guid.TryParse(institutionIdClaim, out var iid) ? iid : Guid.Empty;
 
-            var role = principal.FindFirst(ClaimTypes.Role)?.Value ?? "Admin";
+            var role = jwtToken.Claims.FirstOrDefault(c => c.Type == "role")?.Value ?? "Admin";
 
             return (userId, institutionId, role);
         }

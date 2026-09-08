@@ -51,10 +51,15 @@ public class ApiClient
         var refreshToken = await _tokenService.GetRefreshTokenAsync();
         if (string.IsNullOrEmpty(refreshToken)) return false;
 
+        // The backend identifies the account from the (possibly expired) access
+        // token's claims rather than looking the refresh token up server-side —
+        // it must be sent too, or /v1/auth/refresh always 401s.
+        var oldAccessToken = await _tokenService.GetAccessTokenAsync();
+
         try
         {
             var request = new HttpRequestMessage(HttpMethod.Post, "/v1/auth/refresh");
-            request.Content = JsonContent.Create(new { refreshToken }, options: JsonOptions);
+            request.Content = JsonContent.Create(new { oldAccessToken, refreshToken }, options: JsonOptions);
             var response = await _http.SendAsync(request);
             if (!response.IsSuccessStatusCode) return false;
 
