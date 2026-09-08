@@ -45,6 +45,17 @@ public static class AuthEndpoints
         if (existing is not null)
             return Results.Conflict(new { error = "An institution with this email already exists." });
 
+        // users.Email and institutions.Name both have unique indexes at the DB level —
+        // check both here so a collision is a clean 409 instead of an unhandled
+        // MongoWriteException (duplicate key) surfacing as a 500.
+        var existingUser = await db.Users.Find(u => u.Email == request.AdminEmail).FirstOrDefaultAsync();
+        if (existingUser is not null)
+            return Results.Conflict(new { error = "An account with this email already exists." });
+
+        var existingName = await db.Institutions.Find(i => i.Name == request.InstitutionName).FirstOrDefaultAsync();
+        if (existingName is not null)
+            return Results.Conflict(new { error = "An institution with this name is already registered." });
+
         var institutionId = Guid.NewGuid();
         var adminId = Guid.NewGuid();
         var passwordHash = HashPassword(request.Password);
@@ -72,8 +83,16 @@ public static class AuthEndpoints
             CreatedAt = DateTime.UtcNow
         };
 
-        await db.Institutions.InsertOneAsync(institution);
-        await db.Users.InsertOneAsync(adminUser);
+        try
+        {
+            await db.Institutions.InsertOneAsync(institution);
+            await db.Users.InsertOneAsync(adminUser);
+        }
+        catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            // Defensive backstop for a race between the checks above and the insert.
+            return Results.Conflict(new { error = "An account with this email or institution name already exists." });
+        }
 
         // Generate JWT tokens
         var (accessToken, refreshToken, expiresAt) = GenerateTokens(institutionId, adminId, "Admin");
