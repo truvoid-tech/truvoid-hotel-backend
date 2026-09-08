@@ -6,6 +6,7 @@
 @inject TokenService TokenService
 @inject TruvoIDAuthStateProvider AuthState
 @inject NavigationManager Nav
+@inject ILogger<Login> Logger
 
 <PageTitle>TruvoID " Sign In</PageTitle>
 
@@ -128,10 +129,12 @@
     {
         _isLoading = true;
         _errorMessage = null;
+        Logger.LogInformation("[LOGIN-DEBUG] HandleLogin started for {Email}", _model.Email);
 
         try
         {
             var raw = await Api.PostRawAsync("/v1/auth/login", _model);
+            Logger.LogInformation("[LOGIN-DEBUG] Got response {StatusCode}", raw.StatusCode);
 
             if (raw.StatusCode == System.Net.HttpStatusCode.Unauthorized ||
                 raw.StatusCode == System.Net.HttpStatusCode.BadRequest)
@@ -163,12 +166,14 @@
                 Nav.NavigateTo("/dashboard");
             }
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
+            Logger.LogError(ex, "[LOGIN-DEBUG] HttpRequestException: {Message} | Inner: {Inner}", ex.Message, ex.InnerException?.Message);
             _errorMessage = "Unable to connect. Please check your connection and try again.";
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Logger.LogError(ex, "[LOGIN-DEBUG] {ExType}: {Message} | Inner: {Inner}", ex.GetType().Name, ex.Message, ex.InnerException?.Message);
             _errorMessage = "An unexpected error occurred. Please try again.";
         }
         finally
