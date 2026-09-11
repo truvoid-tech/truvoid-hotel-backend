@@ -18,7 +18,7 @@
                 <p class="font-body-sm text-body-sm text-[#137333]">@_latestCreditNotification.Message</p>
             </div>
         </div>
-        <button @onclick="() => _showCreditBanner = false" class="p-1 hover:bg-[#ceead6] rounded shrink-0">
+        <button @onclick="DismissCreditBanner" class="p-1 hover:bg-[#ceead6] rounded shrink-0">
             <span class="material-symbols-outlined text-[#137333] text-[18px]">close</span>
         </button>
     </div>
@@ -226,11 +226,15 @@ else
         try
         {
             var feed = await notificationsTask;
-            var creditNotif = feed?.FirstOrDefault(n => n.Category == "credit");
+            // Only unread credit notifications trigger the banner — mark it read the
+            // moment it's shown so it pops up once, not on every dashboard visit. It
+            // stays visible afterward in the notification feed/bell dropdown.
+            var creditNotif = feed?.FirstOrDefault(n => n.Category == "credit" && !n.IsRead);
             if (creditNotif is not null)
             {
                 _latestCreditNotification = creditNotif;
                 _showCreditBanner = true;
+                _ = MarkCreditNotificationReadAsync(creditNotif.Id);
             }
         }
         catch { }
@@ -238,6 +242,14 @@ else
         _profileLoaded = true;
         StateHasChanged();
     }
+
+    private async Task MarkCreditNotificationReadAsync(string id)
+    {
+        try { await Api.PostRawAsync($"/v1/notifications/{id}/read", new { }); }
+        catch { }
+    }
+
+    private void DismissCreditBanner() => _showCreditBanner = false;
 
     private string FormatTimeAgo(DateTime date)
     {

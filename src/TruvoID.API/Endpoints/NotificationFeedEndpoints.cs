@@ -55,9 +55,13 @@ public static class NotificationFeedEndpoints
 
     private static async Task<IResult> MarkNotificationRead(
         string id,
+        HttpContext ctx,
         NotificationFeedService feed)
     {
-        await feed.MarkReadAsync(id);
+        var institutionId = ctx.GetInstitutionId();
+        if (institutionId == Guid.Empty) return Results.Unauthorized();
+
+        await feed.MarkReadAsync(institutionId, id);
         return Results.Ok(new { message = "Notification marked as read." });
     }
 

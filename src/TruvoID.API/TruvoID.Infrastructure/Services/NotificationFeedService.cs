@@ -53,15 +53,16 @@ public class NotificationFeedService
     }
 
     /// <summary>
-    /// Mark a single notification as read.
+    /// Mark a single notification as read. Scoped to the owning institution so one
+    /// institution can't mark (or probe the existence of) another's notifications.
     /// </summary>
-    public async Task MarkReadAsync(string notificationId, CancellationToken ct = default)
+    public async Task MarkReadAsync(Guid institutionId, string notificationId, CancellationToken ct = default)
     {
         var update = Builders<NotificationEvent>.Update
             .Set(e => e.IsRead, true)
             .Set(e => e.ReadAt, DateTime.UtcNow);
         await _db.NotificationEvents.UpdateOneAsync(
-            e => e.Id == notificationId, update, cancellationToken: ct);
+            e => e.Id == notificationId && e.InstitutionId == institutionId, update, cancellationToken: ct);
     }
 
     /// <summary>
