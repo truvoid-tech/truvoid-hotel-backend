@@ -139,7 +139,7 @@
         try
         {
             _balance = await Api.GetAsync<WalletBalanceResponse>("/v1/wallet/balance");
-            _recentTransactions = await Api.GetAsync<List<WalletTransactionResponse>>("/v1/wallet/transactions?page=1&pageSize=10");
+            _recentTransactions = (await Api.GetAsync<PaginatedResponse<WalletTransactionResponse>>("/v1/wallet/transactions?page=1&pageSize=10"))?.Items;
             _pricing = await Api.GetAsync<List<InstitutionPricingRateDto>>("/v1/pricing/my-rates");
 
             if (_recentTransactions is not null)

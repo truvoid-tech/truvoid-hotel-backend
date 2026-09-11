@@ -171,7 +171,7 @@ public class PaginatedResponse<T>
     public bool HasPrevious => Page > 1;
 }
 
-public enum VerificationStatus { Match, NoMatch, Error, Pending }
+public enum VerificationStatus { Pending, Match, NoMatch, Error }
 
 public class CallHistoryResponse
 {

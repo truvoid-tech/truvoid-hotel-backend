@@ -216,12 +216,12 @@ else
         // out data that other calls already fetched successfully.
         var profileTask = Api.GetAsync<InstitutionProfileResponse>("/v1/institution/profile");
         var balanceTask = Api.GetAsync<WalletBalanceResponse>("/v1/wallet/balance");
-        var transactionsTask = Api.GetAsync<List<WalletTransactionResponse>>("/v1/wallet/transactions?pageSize=5");
+        var transactionsTask = Api.GetAsync<PaginatedResponse<WalletTransactionResponse>>("/v1/wallet/transactions?pageSize=5");
         var notificationsTask = Api.GetAsync<List<NotificationFeedItem>>("/v1/notifications");
 
         try { _profile = await profileTask; } catch { }
         try { _balance = await balanceTask; } catch { }
-        try { _recentTransactions = await transactionsTask ?? []; } catch { }
+        try { _recentTransactions = (await transactionsTask)?.Items ?? []; } catch { }
 
         try
         {

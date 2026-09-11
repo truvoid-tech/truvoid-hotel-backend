@@ -274,7 +274,7 @@
     {
         try
         {
-            _transactions = await Api.GetAsync<List<WalletTransactionResponse>>($"/v1/wallet/transactions?page={_currentPage}&pageSize=10");
+            _transactions = (await Api.GetAsync<PaginatedResponse<WalletTransactionResponse>>($"/v1/wallet/transactions?page={_currentPage}&pageSize=10"))?.Items;
         }
         catch
         {

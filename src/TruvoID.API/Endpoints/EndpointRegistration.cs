@@ -19,6 +19,7 @@ public static class EndpointRegistration
         app.MapVerificationEndpoints();
         app.MapAdminDashboardEndpoints();
         app.MapApiKeyEndpoints();
+        app.MapCallHistoryEndpoints();
 
         return app;
     }
