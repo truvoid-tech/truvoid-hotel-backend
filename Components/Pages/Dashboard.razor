@@ -11,14 +11,14 @@
 @if (_showCreditBanner && _latestCreditNotification is not null)
 {
     <div class="mx-margin-mobile md:mx-margin-desktop mb-6 bg-[#e6f4ea] border border-[#ceead6] rounded-lg p-4 flex items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
-            <span class="material-symbols-outlined text-[#137333] text-[24px]" style="font-variation-settings: 'FILL' 1;">account_balance_wallet</span>
-            <div>
+        <div class="flex items-center gap-3 min-w-0">
+            <span class="material-symbols-outlined text-[#137333] text-[24px] shrink-0" style="font-variation-settings: 'FILL' 1;">account_balance_wallet</span>
+            <div class="min-w-0">
                 <p class="font-label-md text-label-md text-[#137333] font-semibold">Wallet Credited!</p>
                 <p class="font-body-sm text-body-sm text-[#137333]">@_latestCreditNotification.Message</p>
             </div>
         </div>
-        <button @onclick="() => _showCreditBanner = false" class="p-1 hover:bg-[#ceead6] rounded">
+        <button @onclick="() => _showCreditBanner = false" class="p-1 hover:bg-[#ceead6] rounded shrink-0">
             <span class="material-symbols-outlined text-[#137333] text-[18px]">close</span>
         </button>
     </div>
@@ -55,7 +55,7 @@ else
 
         <!-- Wallet Balance Card -->
         <div class="md:col-span-8 bg-paper-white border-t-[3px] border-t-warm-gold border-x border-b border-outline-variant rounded shadow-sm p-5 sm:p-8 flex flex-col justify-between gap-6 sm:gap-8">
-            <div class="flex justify-between items-start">
+            <div class="flex flex-wrap justify-between items-start gap-4">
                 <div>
                     <p class="font-label-sm text-label-sm text-slate-gray uppercase tracking-wider mb-2">Available Balance</p>
                     <div class="flex items-end gap-2">
@@ -70,19 +70,19 @@ else
                     </div>
                 </div>
             </div>
-            <div class="flex items-center gap-4 border-t border-outline-variant pt-6">
-                <a href="/wallet" class="flex items-center gap-2 bg-warm-gold hover:opacity-90 transition-opacity text-paper-white font-label-md text-label-md uppercase py-2.5 px-6 rounded">
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 border-t border-outline-variant pt-6">
+                <a href="/wallet" class="flex items-center justify-center gap-2 bg-warm-gold hover:opacity-90 transition-opacity text-paper-white font-label-md text-label-md uppercase py-2.5 px-6 rounded">
                     <span class="material-symbols-outlined text-[18px]">add</span>
                     Top Up
                 </a>
-                <a href="/history" class="flex items-center gap-2 border border-outline text-slate-gray hover:text-on-surface hover:border-on-surface transition-colors font-label-md text-label-md uppercase py-2.5 px-6 rounded">
+                <a href="/history" class="flex items-center justify-center gap-2 border border-outline text-slate-gray hover:text-on-surface hover:border-on-surface transition-colors font-label-md text-label-md uppercase py-2.5 px-6 rounded">
                     <span class="material-symbols-outlined text-[18px]">history</span>
                     History
                 </a>
 
                 @if (_showCreditBanner == false)
                 {
-                    <a href="/wallet/topup" class="flex items-center gap-2 bg-[#fef7e0] border border-[#fde083] text-[#b06000] hover:bg-[#fde083] transition-colors font-label-md text-label-md uppercase py-2.5 px-6 rounded">
+                    <a href="/wallet/topup" class="flex items-center justify-center gap-2 bg-[#fef7e0] border border-[#fde083] text-[#b06000] hover:bg-[#fde083] transition-colors font-label-md text-label-md uppercase py-2.5 px-6 rounded">
                         <span class="material-symbols-outlined text-[18px]">send</span>
                         I Have Sent the Money
                     </a>
