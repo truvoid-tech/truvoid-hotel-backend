@@ -211,41 +211,32 @@ else
     {
         if (!firstRender) return;
 
+        // Kick off all requests in parallel, but await each independently so a
+        // failure in one (e.g. a transient auth/token-refresh race) can't wipe
+        // out data that other calls already fetched successfully.
+        var profileTask = Api.GetAsync<InstitutionProfileResponse>("/v1/institution/profile");
+        var balanceTask = Api.GetAsync<WalletBalanceResponse>("/v1/wallet/balance");
+        var transactionsTask = Api.GetAsync<List<WalletTransactionResponse>>("/v1/wallet/transactions?pageSize=5");
+        var notificationsTask = Api.GetAsync<List<NotificationFeedItem>>("/v1/notifications");
+
+        try { _profile = await profileTask; } catch { }
+        try { _balance = await balanceTask; } catch { }
+        try { _recentTransactions = await transactionsTask ?? []; } catch { }
+
         try
         {
-            // Load profile, balance, and recent transactions in parallel
-            var profileTask = Api.GetAsync<InstitutionProfileResponse>("/v1/institution/profile");
-            var balanceTask = Api.GetAsync<WalletBalanceResponse>("/v1/wallet/balance");
-            var transactionsTask = Api.GetAsync<List<WalletTransactionResponse>>("/v1/wallet/transactions?pageSize=5");
-
-            await Task.WhenAll(profileTask, balanceTask, transactionsTask);
-
-            _profile = await profileTask;
-            _balance = await balanceTask;
-            _recentTransactions = await transactionsTask ?? [];
-
-            // Check for credit notifications from the feed
-            try
+            var feed = await notificationsTask;
+            var creditNotif = feed?.FirstOrDefault(n => n.Category == "credit");
+            if (creditNotif is not null)
             {
-                var feed = await Api.GetAsync<List<NotificationFeedItem>>("/v1/notifications");
-                var creditNotif = feed?.FirstOrDefault(n => n.Category == "credit");
-                if (creditNotif is not null)
-                {
-                    _latestCreditNotification = creditNotif;
-                    _showCreditBanner = true;
-                }
+                _latestCreditNotification = creditNotif;
+                _showCreditBanner = true;
             }
-            catch { }
         }
-        catch
-        {
-            // If endpoints aren't available yet, fall through to show empty dashboard
-        }
-        finally
-        {
-            _profileLoaded = true;
-            StateHasChanged();
-        }
+        catch { }
+
+        _profileLoaded = true;
+        StateHasChanged();
     }
 
     private string FormatTimeAgo(DateTime date)
