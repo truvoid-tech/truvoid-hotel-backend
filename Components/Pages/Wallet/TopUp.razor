@@ -69,28 +69,38 @@
                                 </div>
                                 <div>
                                     <p class="font-label-md text-label-md text-on-surface mb-1">Step 1: Transfer to our Bank Account</p>
-                                    <div class="bg-surface-container p-4 rounded border border-outline-variant mb-3">
-                                        <div class="grid grid-cols-2 gap-4 text-sm">
+                                    <div class="bg-surface-container p-4 rounded border border-outline-variant mb-3 space-y-4">
+                                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                                             <div>
                                                 <p class="font-label-sm text-label-sm text-slate-gray uppercase tracking-wider">Bank</p>
-                                                <p class="font-body-md text-body-md text-on-surface font-semibold">Guaranty Trust Bank (GTBank)</p>
+                                                <p class="font-body-md text-body-md text-on-surface font-semibold">Zenith Bank</p>
                                             </div>
                                             <div>
                                                 <p class="font-label-sm text-label-sm text-slate-gray uppercase tracking-wider">Account Name</p>
-                                                <p class="font-body-md text-body-md text-on-surface font-semibold">TruvoID Operations Ltd</p>
+                                                <p class="font-body-md text-body-md text-on-surface font-semibold">Slogani Consults Nigeria Limited</p>
                                             </div>
                                             <div>
                                                 <p class="font-label-sm text-label-sm text-slate-gray uppercase tracking-wider">Account Number</p>
-                                                <p class="font-body-md text-body-md text-on-surface font-semibold font-mono">0000000000</p>
+                                                <p class="font-body-md text-body-md text-on-surface font-semibold font-mono">1017167544</p>
+                                            </div>
+                                        </div>
+                                        <div class="border-t border-outline-variant pt-4 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                                            <div>
+                                                <p class="font-label-sm text-label-sm text-slate-gray uppercase tracking-wider">Bank</p>
+                                                <p class="font-body-md text-body-md text-on-surface font-semibold">Providus Bank</p>
                                             </div>
                                             <div>
-                                                <p class="font-label-sm text-label-sm text-slate-gray uppercase tracking-wider">Account Number (alt)</p>
-                                                <p class="font-body-md text-body-md text-on-surface font-semibold font-mono">0000000001</p>
+                                                <p class="font-label-sm text-label-sm text-slate-gray uppercase tracking-wider">Account Name</p>
+                                                <p class="font-body-md text-body-md text-on-surface font-semibold">Slogani Consults Nigeria Limited</p>
+                                            </div>
+                                            <div>
+                                                <p class="font-label-sm text-label-sm text-slate-gray uppercase tracking-wider">Account Number</p>
+                                                <p class="font-body-md text-body-md text-on-surface font-semibold font-mono">1310418112</p>
                                             </div>
                                         </div>
                                     </div>
                                     <p class="font-body-sm text-body-sm text-slate-gray">
-                                        Transfer the exact amount shown above to any of the accounts above. Keep the transfer reference.
+                                        Transfer the exact amount shown above to either of the accounts above. Keep the transfer reference.
                                     </p>
                                 </div>
                             </div>
@@ -204,7 +214,7 @@
 
             if (response?.Reference is not null)
             {
-                _errorMessage = $"Top-up request submitted! Reference: {response.Reference}. Please transfer ₦{@_amount:N0} to our GTBank account (0000000000 — TruvoID Operations Ltd) and send the receipt to +234 800 000 0000 on WhatsApp. Click 'I Have Sent the Money' on the Dashboard when your account is credited.";
+                _errorMessage = $"Top-up request submitted! Reference: {response.Reference}. Please transfer ₦{@_amount:N0} to either Zenith Bank (1017167544) or Providus Bank (1310418112) — both under Slogani Consults Nigeria Limited — and send the receipt to +234 800 000 0000 on WhatsApp. Click 'I Have Sent the Money' on the Dashboard when your account is credited.";
                 StateHasChanged();
             }
             else
