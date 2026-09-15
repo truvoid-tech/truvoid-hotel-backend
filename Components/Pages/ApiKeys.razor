@@ -4,7 +4,7 @@
 @inject ApiClient Api
 
 <AuthGuard />
-<PageTitle>TruvoID " API Keys</PageTitle>
+<PageTitle>TruvoID — API Keys</PageTitle>
 
 <div class="px-margin-mobile md:px-margin-desktop py-8 md:py-12 flex-1">
 
@@ -127,7 +127,7 @@
 
             @if (_createdKeyRaw is not null)
             {
-                <!-- Key revealed " show once -->
+                <!-- Key revealed — show once -->
                 <div class="bg-[#fef7e0] border border-[#fde083] rounded-lg p-4 mb-4 flex items-start gap-3">
                     <span class="material-symbols-outlined text-[#b06000] mt-0.5">warning</span>
                     <div>
@@ -140,7 +140,7 @@
                 </div>
                 <button @onclick="CloseCreateModal"
                         class="w-full bg-deep-navy text-paper-white font-label-md text-label-md uppercase py-3 rounded hover:opacity-90 transition-opacity">
-                    Done " I've Saved This Key
+                    Done — I've Saved This Key
                 </button>
             }
             else
