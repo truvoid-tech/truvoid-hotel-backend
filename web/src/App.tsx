@@ -814,15 +814,6 @@ function Wallet() {
   );
 }
 function InviteAgency() {
-  const [form, setForm] = useState({
-    agencyName: "",
-    adminFullName: "",
-    adminEmail: "",
-  });
-  const [invite, setInvite] = useState("");
-  const [message, setMessage] = useState("");
-  const [failed, setFailed] = useState(false);
-  const [sending, setSending] = useState(false);
   const [organizations, setOrganizations] = useState<Json[]>([]);
   const [refresh, setRefresh] = useState(0);
   const [reviewing, setReviewing] = useState<{ id: string; name: string } | null>(null);
@@ -917,32 +908,6 @@ function InviteAgency() {
       setCreditBusy(false);
     }
   }
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    if (sending) return;
-    setSending(true);
-    setInvite("");
-    setMessage("");
-    try {
-      const result = await api.post<Json>("/v1/admin/agencies/invite", form);
-      setInvite(
-        `${window.location.origin}/accept-agency-invite?token=${String(result.invitationToken)}`,
-      );
-      setFailed(false);
-      setMessage(
-        "Invitation created and emailed. You can also copy the link below and send it yourself.",
-      );
-      setForm({ agencyName: "", adminFullName: "", adminEmail: "" });
-      setRefresh((value) => value + 1);
-    } catch (error) {
-      setFailed(true);
-      setMessage(
-        error instanceof Error ? error.message : "Could not create invitation.",
-      );
-    } finally {
-      setSending(false);
-    }
-  }
   async function changeStatus(id: string, action: string) {
     if (statusBusy) return;
     setStatusBusy(id);
@@ -958,50 +923,11 @@ function InviteAgency() {
   }
   return (
     <section>
-      <PageTitle eyebrow="PLATFORM / AGENCIES" title="Organizations.">
+      <PageTitle eyebrow="PLATFORM / ORGANIZATIONS" title="Organizations.">
         <p className="lede">
-          Invite agencies and monitor every tenant workspace from one place.
+          Invite institutions and agencies, and monitor every tenant workspace from one place.
         </p>
       </PageTitle>
-      <div className="form-card narrow">
-        <div className="eyebrow">INVITE AGENCY</div>
-        <form onSubmit={submit}>
-          <Field
-            label="Agency name"
-            required
-            value={form.agencyName}
-            onChange={(event) =>
-              setForm({ ...form, agencyName: event.target.value })
-            }
-          />
-          <Field
-            label="Administrator name"
-            required
-            value={form.adminFullName}
-            onChange={(event) =>
-              setForm({ ...form, adminFullName: event.target.value })
-            }
-          />
-          <Field
-            label="Administrator email"
-            required
-            type="email"
-            value={form.adminEmail}
-            onChange={(event) =>
-              setForm({ ...form, adminEmail: event.target.value })
-            }
-          />
-          <Button disabled={sending}>{sending ? "Creating invitation…" : "Generate invitation ↗"}</Button>
-        </form>
-        <Notice message={message} error={failed} />
-        {invite && (
-          <div className="key-reveal">
-            <span>Invitation link</span>
-            <code>{invite}</code>
-            <CopyButton value={invite} label="Copy invitation link" />
-          </div>
-        )}
-      </div>
       {reviewing && (
         <AdminReview
           organization={reviewing}
