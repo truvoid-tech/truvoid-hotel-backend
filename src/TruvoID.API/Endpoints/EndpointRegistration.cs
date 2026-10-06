@@ -24,6 +24,7 @@ public static class EndpointRegistration
         app.MapTenantTeamEndpoints();
         app.MapPricingEndpoints();
         app.MapPasswordResetEndpoints();
+        app.MapNotificationEndpoints();
 
         return app;
     }

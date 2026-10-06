@@ -28,6 +28,7 @@ import { SettingsPage } from "./SettingsPage";
 import { AdminReview } from "./AdminReview";
 import { CopyButton } from "./CopyButton";
 import { ConfirmButton } from "./ConfirmButton";
+import { NotificationsBell } from "./NotificationsBell";
 import { useEnvironment } from "./useEnvironment";
 import { useMode } from "./mode";
 
@@ -245,6 +246,7 @@ function Shell({
                 </button>
               </div>
             )}
+            <NotificationsBell />
             <span className="eyebrow">{profile.fullName || profile.email}</span>
             <div className="avatar">{(profile.fullName || profile.email)[0].toUpperCase()}</div>
           </div>

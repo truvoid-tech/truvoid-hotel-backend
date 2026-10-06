@@ -265,6 +265,12 @@ public class HttpEndpointTests(ApiFactory factory) : IClassFixture<ApiFactory>
         var meBody = await me.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("approved", meBody.GetProperty("setupStatus").GetString());
         Assert.True(meBody.GetProperty("liveEnabled").GetBoolean());
+
+        // The approval also created an in-app notification for the organization admin.
+        var notifications = await client.GetAsync("/v1/notifications");
+        Assert.Equal(HttpStatusCode.OK, notifications.StatusCode);
+        var feed = await notifications.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(feed.GetProperty("unread").GetInt32() >= 1);
     }
 
     [Fact]

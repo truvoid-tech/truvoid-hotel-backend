@@ -162,6 +162,7 @@ builder.Services.AddSingleton(sp => new PostgresApiKeyStore(
 builder.Services.AddSingleton<OrganizationSetupStore>();
 builder.Services.AddSingleton<OrganizationBrandingStore>();
 builder.Services.AddSingleton<OrganizationInvitationStore>();
+builder.Services.AddSingleton<NotificationStore>();
 builder.Services.AddSingleton(CreateTenantCredentialProtector(builder.Configuration));
 builder.Services.AddSingleton<TenantConnectionFactory>(sp => new TenantConnectionFactory(
     sp.GetRequiredService<NpgsqlDataSource>(),

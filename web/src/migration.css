@@ -272,6 +272,21 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .forgot-link { justify-self: end; margin-top: -8px; color: var(--cyan); font-size: 12px; }
 
 /* ── Test/Live mode & profile review ─────────────────────────────────────── */
+.notif { position: relative; }
+.notif-bell { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 1px solid var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+.notif-bell:hover { color: #fff; }
+.notif-badge { position: absolute; top: -7px; right: -7px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: var(--cyan); color: #071018; font: 10px 'DM Mono', monospace; line-height: 17px; text-align: center; }
+.notif-panel { position: absolute; right: 0; top: calc(100% + 8px); z-index: 40; width: 340px; max-width: 92vw; border: 1px solid var(--line); background: var(--panel); box-shadow: 0 18px 40px rgba(0,0,0,.35); }
+.notif-head { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.notif-head strong { margin-right: auto; font-size: 13px; }
+.notif-list { list-style: none; margin: 0; padding: 0; max-height: 380px; overflow-y: auto; }
+.notif-list li { border-bottom: 1px solid var(--line); }
+.notif-list li.read { opacity: .6; }
+.notif-list a, .notif-static { display: grid; gap: 4px; padding: 12px 14px; color: #e9edf5; text-decoration: none; }
+.notif-list a:hover { background: #151a23; }
+.notif-list a strong, .notif-static strong { color: var(--cyan); font-size: 13px; }
+.notif-list a span, .notif-static span { color: #cbd1dc; font-size: 12px; }
+.notif-list small { color: var(--muted); font: 10px 'DM Mono', monospace; }
 .mode-switch { display: inline-flex; border: 1px solid var(--line); }
 .mode-switch button { padding: 7px 14px; border: 0; background: transparent; color: var(--muted); cursor: pointer; font: 11px 'DM Mono', monospace; letter-spacing: .1em; text-transform: uppercase; }
 .mode-switch button:disabled { cursor: not-allowed; opacity: .45; }

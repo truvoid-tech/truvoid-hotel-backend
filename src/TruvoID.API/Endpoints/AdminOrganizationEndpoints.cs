@@ -24,17 +24,17 @@ public static class AdminOrganizationEndpoints
                 ? Results.File(doc.Content, doc.ContentType, doc.FileName)
                 : Results.NotFound(new { error = "Document not found." }));
         group.MapPost("/{id:guid}/setup/approve", (HttpContext ctx, Guid id, ReviewRequest? request, OrganizationSetupStore setup,
-                NpgsqlDataSource db, IEmailService email, ILoggerFactory loggers, CancellationToken ct) =>
-            Review(ctx, id, approve: true, request?.Note, setup, db, email, loggers, ct));
+                NpgsqlDataSource db, IEmailService email, NotificationStore notifications, ILoggerFactory loggers, CancellationToken ct) =>
+            Review(ctx, id, approve: true, request?.Note, setup, db, email, notifications, loggers, ct));
         group.MapPost("/{id:guid}/setup/request-changes", (HttpContext ctx, Guid id, ReviewRequest? request, OrganizationSetupStore setup,
-                NpgsqlDataSource db, IEmailService email, ILoggerFactory loggers, CancellationToken ct) =>
-            Review(ctx, id, approve: false, request?.Note, setup, db, email, loggers, ct));
+                NpgsqlDataSource db, IEmailService email, NotificationStore notifications, ILoggerFactory loggers, CancellationToken ct) =>
+            Review(ctx, id, approve: false, request?.Note, setup, db, email, notifications, loggers, ct));
         return app;
     }
 
     private static async Task<IResult> Review(
         HttpContext ctx, Guid organizationId, bool approve, string? note, OrganizationSetupStore setup,
-        NpgsqlDataSource db, IEmailService email, ILoggerFactory loggers, CancellationToken ct)
+        NpgsqlDataSource db, IEmailService email, NotificationStore notifications, ILoggerFactory loggers, CancellationToken ct)
     {
         try
         {
@@ -44,6 +44,20 @@ public static class AdminOrganizationEndpoints
         catch (ArgumentException ex)
         {
             return Results.BadRequest(new { error = ex.Message });
+        }
+
+        // In-app notification for the organization's admins (never blocks the review).
+        try
+        {
+            await notifications.NotifyOrganizationAdminsAsync(organizationId,
+                approve ? "profile_approved" : "profile_changes",
+                approve ? "Your organization profile is approved" : "Changes requested on your profile",
+                approve ? "Live verification is now enabled." : (note ?? "Update your profile and resubmit it."),
+                "/setup", ct);
+        }
+        catch (Exception ex)
+        {
+            loggers.CreateLogger(nameof(AdminOrganizationEndpoints)).LogError(ex, "Review notification failed for organization {OrganizationId}", organizationId);
         }
 
         if (approve)
