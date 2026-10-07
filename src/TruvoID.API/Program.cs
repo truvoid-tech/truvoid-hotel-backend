@@ -348,6 +348,29 @@ else
     });
 }
 
+// Structured request logging with a correlation id. Only method, path, status and
+// elapsed time are logged — never tokens, subjects, or request bodies.
+app.Use(async (ctx, next) =>
+{
+    var requestId = ctx.Request.Headers["X-Request-Id"].FirstOrDefault();
+    if (string.IsNullOrWhiteSpace(requestId) || requestId.Length > 64) requestId = Guid.NewGuid().ToString("N");
+    ctx.TraceIdentifier = requestId;
+    ctx.Response.Headers["X-Request-Id"] = requestId;
+    var logger = ctx.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("Http");
+    var started = System.Diagnostics.Stopwatch.GetTimestamp();
+    try
+    {
+        await next();
+    }
+    finally
+    {
+        var elapsedMs = (long)System.Diagnostics.Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+        var level = ctx.Response.StatusCode >= 500 ? LogLevel.Warning : LogLevel.Information;
+        logger.Log(level, "{Method} {Path} => {Status} in {ElapsedMs}ms [rid:{RequestId}]",
+            ctx.Request.Method, ctx.Request.Path.Value, ctx.Response.StatusCode, elapsedMs, requestId);
+    }
+});
+
 app.Use(async (ctx, next) =>
 {
     var headers = ctx.Response.Headers;
@@ -388,6 +411,23 @@ app.MapGet("/health", () => Results.Ok(new
     verification = identityProvider.IsConfigured ? "configured" : "not_configured",
     email = emailConfigured ? "configured" : "not_configured",
 })).AllowAnonymous();
+
+// Readiness: verifies the database is reachable, so a platform can pull a draining
+// instance out of rotation without touching liveness.
+app.MapGet("/health/ready", async (NpgsqlDataSource db) =>
+{
+    try
+    {
+        await using var command = db.CreateCommand("SELECT 1");
+        await command.ExecuteScalarAsync();
+        return Results.Ok(new { status = "ready" });
+    }
+    catch
+    {
+        return Results.StatusCode(StatusCodes.Status503ServiceUnavailable);
+    }
+}).AllowAnonymous();
+
 app.MapTruvoIdEndpoints();
 
 app.Run();
